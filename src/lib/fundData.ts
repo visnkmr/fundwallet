@@ -237,8 +237,14 @@ class FundDataProcessor {
       return date.getFullYear();
     }).filter(year => !isNaN(year))));
     const managerList = this.getUniqueValues(funds.map(f => f.manager).filter(m => m && m.trim() !== ''));
+    const settlementTypeList = this.getUniqueValues(funds.map(f => f.settlementType).filter(s => s && s.trim() !== ''));
+    const purchaseAllowedList = this.getUniqueValues(funds.map(f => f.purchaseAllowed));
+    const redemptionAllowedList = this.getUniqueValues(funds.map(f => f.redemptionAllowed));
+    const amcSipFlagList = this.getUniqueValues(funds.map(f => f.amcSipFlag));
+    const subSchemeList = this.getUniqueValues(funds.map(f => f.subScheme).filter(s => s && s.trim() !== ''));
+    const lockInList = this.getUniqueValues(funds.map(f => f.lockIn).filter(l => l > 0));
 
-    const filterOptions = {
+    const filterOptions: FilterOptions = {
       amc: amcList,
       scheme: schemeList,
       plan: planList,
@@ -247,7 +253,13 @@ class FundDataProcessor {
       minPurchaseAmt: minPurchaseAmtList,
       expenseRatio: expenseRatioList,
       launchYear: launchYearList,
-      manager: managerList
+      manager: managerList,
+      settlementType: settlementTypeList,
+      purchaseAllowed: purchaseAllowedList,
+      redemptionAllowed: redemptionAllowedList,
+      amcSipFlag: amcSipFlagList,
+      subScheme: subSchemeList,
+      lockIn: lockInList
     };
 
     // Cache the filter options
@@ -279,7 +291,13 @@ class FundDataProcessor {
       return match ? parseFloat(match[1]) : 0;
     }).filter(v => v !== null && v !== undefined);
 
-    const rangeValues = {
+    // Extract launch years
+    const launchYears = funds.map(f => {
+      const date = new Date(f.launchDate);
+      return date.getFullYear();
+    }).filter(year => !isNaN(year));
+
+    const rangeValues: RangeValues = {
       oneYearReturn: {
         min: Math.min(...oneYearReturns),
         max: Math.max(...oneYearReturns)
@@ -303,6 +321,10 @@ class FundDataProcessor {
       nav: {
         min: Math.min(...navs),
         max: Math.max(...navs)
+      },
+      launchYear: {
+        min: Math.min(...launchYears),
+        max: Math.max(...launchYears)
       }
     };
 

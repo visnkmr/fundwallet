@@ -3,9 +3,10 @@ import { FundData } from '@/types/fund';
 
 interface FundCardProps {
   fund: FundData;
+  onManagerClick?: (manager: string) => void;
 }
 
-export default function FundCard({ fund }: FundCardProps) {
+export default function FundCard({ fund, onManagerClick }: FundCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const formatCurrency = (value: number) => {
@@ -66,6 +67,9 @@ export default function FundCard({ fund }: FundCardProps) {
             </span>
             <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
               {fund.plan}
+            </span>
+            <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+              {fund.settlementType}
             </span>
             <span className={`px-2 py-1 text-xs rounded-full ${getRiskColor(fund.risk)}`}>
               {getRiskLabel(fund.risk)}
@@ -147,7 +151,12 @@ export default function FundCard({ fund }: FundCardProps) {
       <div className="mt-4 pt-4 border-t">
         <div className="flex justify-between items-center">
           <p className="text-xs text-gray-500">
-            Fund Manager: <span className="font-medium text-gray-700">{fund.manager}</span>
+            Fund Manager: <button
+              onClick={() => onManagerClick?.(fund.manager)}
+              className="font-medium text-blue-600 hover:text-blue-800 underline cursor-pointer"
+            >
+              {fund.manager}
+            </button>
           </p>
           <p className="text-xs text-gray-500">
             Launch: <span className="font-medium text-gray-700">{formatDate(fund.launchDate)}</span>

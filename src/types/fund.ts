@@ -52,6 +52,12 @@ export interface FilterOptions {
   expenseRatio: number[];
   launchYear: number[];
   manager: string[];
+  settlementType: string[];
+  purchaseAllowed: boolean[];
+  redemptionAllowed: boolean[];
+  amcSipFlag: boolean[];
+  subScheme: string[];
+  lockIn: number[];
 }
 
 export interface FundFilters {
@@ -69,10 +75,16 @@ export interface FundFilters {
   aumRange?: [number, number];
   minInvestmentRange?: [number, number];
   navRange?: [number, number];
-  launchYear?: number[];
+  launchYearRange?: [number, number];
   manager?: string[];
   sort?: string;
   excludeStrings?: string[];
+  settlementType?: string[];
+  purchaseAllowed?: boolean[];
+  redemptionAllowed?: boolean[];
+  amcSipFlag?: boolean[];
+  subScheme?: string[];
+  lockIn?: number[];
 }
 
 export interface RangeValues {
@@ -82,4 +94,5 @@ export interface RangeValues {
   aum: { min: number; max: number };
   minInvestment: { min: number; max: number };
   nav: { min: number; max: number };
+  launchYear: { min: number; max: number };
 }

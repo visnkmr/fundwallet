@@ -179,18 +179,29 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
                 step={0.1}
               />
 
-              {/* AUM Range */}
-              <RangeSlider
-                label="AUM (Assets Under Management)"
-                min={rangeValues.aum.min}
-                max={rangeValues.aum.max}
-                value={filters.aumRange || [rangeValues.aum.min, rangeValues.aum.max]}
-                onChange={(value) => handleRangeChange('aumRange', value)}
-                format={(v) => `₹${(v / 10000000).toFixed(0)}Cr`}
-                step={1000000}
-              />
-            </div>
-          </div>
+               {/* AUM Range */}
+               <RangeSlider
+                 label="AUM (Assets Under Management)"
+                 min={rangeValues.aum.min}
+                 max={rangeValues.aum.max}
+                 value={filters.aumRange || [rangeValues.aum.min, rangeValues.aum.max]}
+                 onChange={(value) => handleRangeChange('aumRange', value)}
+                 format={(v) => `₹${(v / 10000000).toFixed(0)}Cr`}
+                 step={1000000}
+               />
+
+               {/* Launch Year Range */}
+               <RangeSlider
+                 label="Launch Year"
+                 min={rangeValues.launchYear.min}
+                 max={rangeValues.launchYear.max}
+                 value={filters.launchYearRange || [rangeValues.launchYear.min, rangeValues.launchYear.max]}
+                 onChange={(value) => handleRangeChange('launchYearRange', value)}
+                 format={(v) => v.toString()}
+                 step={1}
+               />
+             </div>
+           </div>
 
           {/* Checkbox Filters Section */}
           <div>
@@ -288,23 +299,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
                  </div>
                </div>
 
-               {/* Launch Year Filter */}
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-2">Launch Year</label>
-                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                   {filterOptions.launchYear?.sort((a: number, b: number) => b - a).map((year: number) => (
-                     <label key={year} className="flex items-center hover:bg-gray-50 p-1 rounded">
-                       <input
-                         type="checkbox"
-                         checked={filters.launchYear?.includes(year) || false}
-                         onChange={() => handleCheckboxChange('launchYear', year.toString())}
-                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                       />
-                       <span className="text-sm text-gray-700">{year}</span>
-                     </label>
-                   ))}
-                 </div>
-               </div>
+
 
                {/* Fund Manager Filter */}
                <div>
@@ -319,6 +314,183 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
                          className="mr-2 rounded text-blue-500 focus:ring-blue-500"
                        />
                        <span className="text-sm text-gray-700">{manager}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Settlement Type Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Settlement Type</label>
+                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.settlementType?.sort().map((settlementType: string) => (
+                     <label key={settlementType} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.settlementType?.includes(settlementType) || false}
+                         onChange={() => handleCheckboxChange('settlementType', settlementType)}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{settlementType}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Availability Filters */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Fund Availability</label>
+                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                   <div className="space-y-1">
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.purchaseAllowed?.includes(true) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.purchaseAllowed || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, true]
+                             : currentValues.filter(v => v !== true);
+                           onFiltersChange({
+                             ...filters,
+                             purchaseAllowed: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-green-500 focus:ring-green-500"
+                       />
+                       <span className="text-sm text-gray-700">Purchase Available</span>
+                     </label>
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.purchaseAllowed?.includes(false) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.purchaseAllowed || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, false]
+                             : currentValues.filter(v => v !== false);
+                           onFiltersChange({
+                             ...filters,
+                             purchaseAllowed: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-red-500 focus:ring-red-500"
+                       />
+                       <span className="text-sm text-gray-700">Purchase Not Available</span>
+                     </label>
+                   </div>
+
+                   <div className="space-y-1">
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.redemptionAllowed?.includes(true) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.redemptionAllowed || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, true]
+                             : currentValues.filter(v => v !== true);
+                           onFiltersChange({
+                             ...filters,
+                             redemptionAllowed: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-green-500 focus:ring-green-500"
+                       />
+                       <span className="text-sm text-gray-700">Redemption Available</span>
+                     </label>
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.redemptionAllowed?.includes(false) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.redemptionAllowed || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, false]
+                             : currentValues.filter(v => v !== false);
+                           onFiltersChange({
+                             ...filters,
+                             redemptionAllowed: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-red-500 focus:ring-red-500"
+                       />
+                       <span className="text-sm text-gray-700">Redemption Not Available</span>
+                     </label>
+                   </div>
+
+                   <div className="space-y-1">
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.amcSipFlag?.includes(true) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.amcSipFlag || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, true]
+                             : currentValues.filter(v => v !== true);
+                           onFiltersChange({
+                             ...filters,
+                             amcSipFlag: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-green-500 focus:ring-green-500"
+                       />
+                       <span className="text-sm text-gray-700">SIP Available</span>
+                     </label>
+                     <label className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.amcSipFlag?.includes(false) || false}
+                         onChange={(e) => {
+                           const currentValues = filters.amcSipFlag || [];
+                           const newValues = e.target.checked
+                             ? [...currentValues, false]
+                             : currentValues.filter(v => v !== false);
+                           onFiltersChange({
+                             ...filters,
+                             amcSipFlag: newValues.length > 0 ? newValues : undefined
+                           });
+                         }}
+                         className="mr-2 rounded text-red-500 focus:ring-red-500"
+                       />
+                       <span className="text-sm text-gray-700">SIP Not Available</span>
+                     </label>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Sub Scheme Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Sub Scheme</label>
+                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.subScheme?.sort().map((subScheme: string) => (
+                     <label key={subScheme} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.subScheme?.includes(subScheme) || false}
+                         onChange={() => handleCheckboxChange('subScheme', subScheme)}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{subScheme}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Lock-in Period Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Lock-in Period</label>
+                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.lockIn?.sort((a: number, b: number) => a - b).map((lockIn: number) => (
+                     <label key={lockIn} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.lockIn?.includes(lockIn) || false}
+                         onChange={() => handleCheckboxChange('lockIn', lockIn.toString())}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{lockIn} days</span>
                      </label>
                    ))}
                  </div>

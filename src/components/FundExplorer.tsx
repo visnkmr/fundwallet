@@ -58,15 +58,39 @@ export default function FundExplorer() {
       result = result.filter(fund => filters.risk!.includes(fund.risk));
     }
 
-    if (filters.launchYear && filters.launchYear.length > 0) {
+    if (filters.launchYearRange) {
       result = result.filter(fund => {
         const launchYear = new Date(fund.launchDate).getFullYear();
-        return filters.launchYear!.includes(launchYear);
+        return launchYear >= filters.launchYearRange![0] && launchYear <= filters.launchYearRange![1];
       });
     }
 
     if (filters.manager && filters.manager.length > 0) {
       result = result.filter(fund => filters.manager!.includes(fund.manager));
+    }
+
+    if (filters.settlementType && filters.settlementType.length > 0) {
+      result = result.filter(fund => filters.settlementType!.includes(fund.settlementType));
+    }
+
+    if (filters.purchaseAllowed && filters.purchaseAllowed.length > 0) {
+      result = result.filter(fund => filters.purchaseAllowed!.includes(fund.purchaseAllowed));
+    }
+
+    if (filters.redemptionAllowed && filters.redemptionAllowed.length > 0) {
+      result = result.filter(fund => filters.redemptionAllowed!.includes(fund.redemptionAllowed));
+    }
+
+    if (filters.amcSipFlag && filters.amcSipFlag.length > 0) {
+      result = result.filter(fund => filters.amcSipFlag!.includes(fund.amcSipFlag));
+    }
+
+    if (filters.subScheme && filters.subScheme.length > 0) {
+      result = result.filter(fund => filters.subScheme!.includes(fund.subScheme));
+    }
+
+    if (filters.lockIn && filters.lockIn.length > 0) {
+      result = result.filter(fund => filters.lockIn!.includes(fund.lockIn));
     }
 
     // Apply range filters
@@ -168,6 +192,14 @@ export default function FundExplorer() {
     return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  const handleManagerSort = (manager: string) => {
+    setFilters(prev => ({
+      ...prev,
+      manager: [manager],
+      sort: undefined // Clear any existing sort when filtering by manager
+    }));
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -210,7 +242,7 @@ export default function FundExplorer() {
         {/* Fund List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredFunds.slice(0, 50).map((fund) => (
-            <FundCard fund={fund}/>
+            <FundCard fund={fund} onManagerClick={handleManagerSort}/>
           ))}
         </div>
 
