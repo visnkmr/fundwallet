@@ -1,4 +1,4 @@
-import { FundData, FilterOptions } from '@/types/fund';
+import { FundData, FilterOptions, RangeValues } from '@/types/fund';
 // Import JSON data from external files
 import uData from '../../u.json';
 import sData from '../../s.json';
@@ -13,6 +13,10 @@ const u = uData;
 const s = sData;
 
 class FundDataProcessor {
+  private cachedFunds: FundData[] | null = null;
+  private cachedFilterOptions: FilterOptions | null = null;
+  private cachedRangeValues: any | null = null;
+
   private amcToIconIndex = {
     AXISMUTUALFUND_MF: 0,
     BARODAMUTUALFUND_MF: 1,
@@ -131,6 +135,14 @@ class FundDataProcessor {
   }
 
   parseInstrumentsData(): FundData[] {
+    // Return cached data if available
+    if (this.cachedFunds !== null) {
+      console.log('Using cached fund data');
+      return this.cachedFunds;
+    }
+
+    console.log('Parsing fund data from JSON...');
+
     let e = this.getInstrumentsDaily();
     let t = this.getInstrumentsMeta();
     let fc = this.getFactsheetData();
@@ -197,10 +209,20 @@ class FundDataProcessor {
       }
     });
 
+    // Cache the parsed data
+    this.cachedFunds = n;
     return n;
   }
 
   getFilterOptions(): FilterOptions {
+    // Return cached filter options if available
+    if (this.cachedFilterOptions !== null) {
+      console.log('Using cached filter options');
+      return this.cachedFilterOptions;
+    }
+
+    console.log('Generating filter options...');
+
     const funds = this.parseInstrumentsData();
 
     const amcList = this.getUniqueValues(funds.map(f => f.amc));
@@ -216,7 +238,7 @@ class FundDataProcessor {
     }).filter(year => !isNaN(year))));
     const managerList = this.getUniqueValues(funds.map(f => f.manager).filter(m => m && m.trim() !== ''));
 
-    return {
+    const filterOptions = {
       amc: amcList,
       scheme: schemeList,
       plan: planList,
@@ -227,9 +249,21 @@ class FundDataProcessor {
       launchYear: launchYearList,
       manager: managerList
     };
+
+    // Cache the filter options
+    this.cachedFilterOptions = filterOptions;
+    return filterOptions;
   }
 
-  getRangeValues() {
+  getRangeValues(): RangeValues {
+    // Return cached range values if available
+    if (this.cachedRangeValues !== null) {
+      console.log('Using cached range values');
+      return this.cachedRangeValues;
+    }
+
+    console.log('Calculating range values...');
+
     const funds = this.parseInstrumentsData();
 
     const oneYearReturns = funds.map(f => f.oneYearPercent).filter(v => v !== null && v !== undefined);
@@ -245,7 +279,7 @@ class FundDataProcessor {
       return match ? parseFloat(match[1]) : 0;
     }).filter(v => v !== null && v !== undefined);
 
-    return {
+    const rangeValues = {
       oneYearReturn: {
         min: Math.min(...oneYearReturns),
         max: Math.max(...oneYearReturns)
@@ -271,6 +305,17 @@ class FundDataProcessor {
         max: Math.max(...navs)
       }
     };
+
+    // Cache the range values
+    this.cachedRangeValues = rangeValues;
+    return rangeValues;
+  }
+
+  // Method to clear cache (useful for development/testing)
+  clearCache(): void {
+    this.cachedFunds = null;
+    this.cachedFilterOptions = null;
+    this.cachedRangeValues = null;
   }
 }
 
