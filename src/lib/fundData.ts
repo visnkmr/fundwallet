@@ -286,10 +286,25 @@ class FundDataProcessor {
 
     // Extract exit load percentages from exit load strings
     const exitLoads = funds.map(f => {
-      if (!f.exitLoad || f.exitLoad === "0" || f.exitLoad === "Nil") return 0;
+      if (!f.exitLoad || f.exitLoad === "0" || f.exitLoad === "Nil" || f.exitLoad === "nil") return 0;
+
+      // Handle various exit load formats like "1%", "1.5%", "0.5% for 1 year", etc.
       const match = f.exitLoad.match(/(\d+\.?\d*)%/);
-      return match ? parseFloat(match[1]) : 0;
-    }).filter(v => v !== null && v !== undefined);
+      if (match) {
+        return parseFloat(match[1]);
+      } else {
+        // Try to extract any number that might be a percentage
+        const numMatch = f.exitLoad.match(/(\d+\.?\d*)/);
+        if (numMatch) {
+          const num = parseFloat(numMatch[1]);
+          // If the number is between 0 and 100, assume it's a percentage
+          if (num >= 0 && num <= 100) {
+            return num;
+          }
+        }
+      }
+      return 0;
+    }).filter(v => v !== null && v !== undefined && v !== 0);
 
     // Extract launch years
     const launchYears = funds.map(f => {
