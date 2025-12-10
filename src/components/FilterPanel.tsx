@@ -1,0 +1,255 @@
+'use client';
+
+import { useState } from 'react';
+import { FundFilters } from '@/types/fund';
+import RangeSlider from './RangeSlider';
+import { getRangeValues } from '@/lib/fundData';
+
+interface FilterPanelProps {
+  filters: FundFilters;
+  onFiltersChange: (filters: FundFilters) => void;
+  filterOptions: any;
+}
+
+export default function FilterPanel({ filters, onFiltersChange, filterOptions }: FilterPanelProps) {
+  const [isExpanded, setIsExpanded] = useState(true);
+  const rangeValues = getRangeValues();
+
+  const handleCheckboxChange = (category: keyof FundFilters, value: string) => {
+    const currentValues = filters[category] as string[] || [];
+    const newValues = currentValues.includes(value)
+      ? currentValues.filter(v => v !== value)
+      : [...currentValues, value];
+
+    onFiltersChange({
+      ...filters,
+      [category]: newValues.length > 0 ? newValues : undefined
+    });
+  };
+
+  const handleSearchChange = (value: string) => {
+    onFiltersChange({
+      ...filters,
+      search: value || undefined
+    });
+  };
+
+  const handleRangeChange = (category: keyof FundFilters, value: [number, number]) => {
+    onFiltersChange({
+      ...filters,
+      [category]: value
+    });
+  };
+
+  const clearFilters = () => {
+    onFiltersChange({});
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold text-gray-800">Filter Funds</h2>
+        <div className="flex gap-2">
+          <button
+            onClick={clearFilters}
+            className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+          >
+            Clear All
+          </button>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          >
+            {isExpanded ? 'Collapse' : 'Expand'}
+          </button>
+        </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Search Funds</label>
+        <input
+          type="text"
+          placeholder="Search by fund name, AMC, or scheme..."
+          value={filters.search || ''}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
+
+      {isExpanded && (
+        <>
+          {/* Range Filters Section */}
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Range Filters</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Min Investment Range */}
+              <RangeSlider
+                label="Min Investment"
+                min={rangeValues.minInvestment.min}
+                max={rangeValues.minInvestment.max}
+                value={filters.minInvestmentRange || [rangeValues.minInvestment.min, rangeValues.minInvestment.max]}
+                onChange={(value) => handleRangeChange('minInvestmentRange', value)}
+                format={(v) => `₹${v.toLocaleString('en-IN')}`}
+                step={100}
+              />
+
+              {/* NAV Range */}
+              <RangeSlider
+                label="NAV (Price)"
+                min={rangeValues.nav.min}
+                max={rangeValues.nav.max}
+                value={filters.navRange || [rangeValues.nav.min, rangeValues.nav.max]}
+                onChange={(value) => handleRangeChange('navRange', value)}
+                format={(v) => `₹${v.toFixed(2)}`}
+                step={0.01}
+              />
+
+              {/* Expense Ratio Range */}
+              <RangeSlider
+                label="Expense Ratio"
+                min={rangeValues.expenseRatio.min}
+                max={rangeValues.expenseRatio.max}
+                value={filters.expenseRatioRange || [rangeValues.expenseRatio.min, rangeValues.expenseRatio.max]}
+                onChange={(value) => handleRangeChange('expenseRatioRange', value)}
+                format={(v) => `${v.toFixed(2)}%`}
+                step={0.01}
+              />
+
+              {/* Exit Load Range */}
+              <RangeSlider
+                label="Exit Load"
+                min={rangeValues.exitLoad.min}
+                max={rangeValues.exitLoad.max}
+                value={filters.exitLoadRange || [rangeValues.exitLoad.min, rangeValues.exitLoad.max]}
+                onChange={(value) => handleRangeChange('exitLoadRange', value)}
+                format={(v) => `${v.toFixed(2)}%`}
+                step={0.01}
+              />
+
+              {/* 1-Year Return (CAGR) Range */}
+              <RangeSlider
+                label="1-Year Return (CAGR)"
+                min={rangeValues.oneYearReturn.min}
+                max={rangeValues.oneYearReturn.max}
+                value={filters.oneYearReturn || [rangeValues.oneYearReturn.min, rangeValues.oneYearReturn.max]}
+                onChange={(value) => handleRangeChange('oneYearReturn', value)}
+                format={(v) => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`}
+                step={0.1}
+              />
+
+              {/* AUM Range */}
+              <RangeSlider
+                label="AUM (Assets Under Management)"
+                min={rangeValues.aum.min}
+                max={rangeValues.aum.max}
+                value={filters.aumRange || [rangeValues.aum.min, rangeValues.aum.max]}
+                onChange={(value) => handleRangeChange('aumRange', value)}
+                format={(v) => `₹${(v / 10000000).toFixed(0)}Cr`}
+                step={1000000}
+              />
+            </div>
+          </div>
+
+          {/* Checkbox Filters Section */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Category Filters</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* AMC Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">AMC</label>
+                <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                  {filterOptions.amc?.map((amc: string) => (
+                    <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={filters.amc?.includes(amc) || false}
+                        onChange={() => handleCheckboxChange('amc', amc)}
+                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{amc}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Scheme Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Scheme Type</label>
+                <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                  {filterOptions.scheme?.map((scheme: string) => (
+                    <label key={scheme} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={filters.scheme?.includes(scheme) || false}
+                        onChange={() => handleCheckboxChange('scheme', scheme)}
+                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{scheme}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Plan Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
+                <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                  {filterOptions.plan?.map((plan: string) => (
+                    <label key={plan} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={filters.plan?.includes(plan) || false}
+                        onChange={() => handleCheckboxChange('plan', plan)}
+                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{plan}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dividend Interval Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Dividend Interval</label>
+                <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                  {filterOptions.dividendInterval?.map((interval: string) => (
+                    <label key={interval} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={filters.dividendInterval?.includes(interval) || false}
+                        onChange={() => handleCheckboxChange('dividendInterval', interval)}
+                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">{interval}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Risk Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
+                <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                  {filterOptions.risk?.map((risk: number) => (
+                    <label key={risk} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={filters.risk?.includes(risk) || false}
+                        onChange={() => handleCheckboxChange('risk', risk.toString())}
+                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                      />
+                      <span className="text-sm text-gray-700">
+                        {risk === 1 ? 'Low Risk' : risk === 3 ? 'Medium Risk' : risk === 5 ? 'High Risk' : `Risk ${risk}`}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
