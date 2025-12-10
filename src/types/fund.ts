@@ -38,6 +38,8 @@ export interface FundData {
   fileNamePath: string;
   fundPrimaryDetail: string;
   fundSlug: string;
+  realAmcName?: string;
+  factsheetLink?: string;
 }
 
 export interface FilterOptions {

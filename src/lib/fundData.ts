@@ -92,6 +92,11 @@ class FundDataProcessor {
     return e;
   }
 
+  getFactsheetData() {
+    // @ts-ignore
+    return u.FC || [];
+  }
+
   stripPlanName(e: string) {
     return e.replace("  ", " ").replace(" - Direct Plan", "").replace(" - Regular Plan", "");
   }
@@ -128,6 +133,8 @@ class FundDataProcessor {
   parseInstrumentsData(): FundData[] {
     let e = this.getInstrumentsDaily();
     let t = this.getInstrumentsMeta();
+    let fc = this.getFactsheetData();
+    let fcMap = new Map(fc.map((item: any) => [item[0], { link: item[1], name: item[2] }]));
     let n: FundData[] = [];
     let i: string[] = [];
     let d = new Map(t.map((item: any) => [item[0], true]));
@@ -154,6 +161,12 @@ class FundDataProcessor {
         a.fiveYearPercent = e[12] as number;
         a.aum = 10000000 * (e[13] as number);
         a.amc = u[1] as string;
+
+        const amcData = fcMap.get(a.amc);
+        if (amcData) {
+          a.realAmcName = amcData.name;
+          a.factsheetLink = amcData.link;
+        }
         a.fund = this.stripPlanName(u[2] as string);
         a.fundLowerCase = this.stripPlanName(u[2] as string).toLowerCase();
         a.minPurchaseAmt = u[3] as number;

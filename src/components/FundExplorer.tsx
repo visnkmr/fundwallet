@@ -162,7 +162,7 @@ export default function FundExplorer() {
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-800 mb-1">{fund.fund}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{fund.amc}</p>
+                  <p className="text-sm text-gray-600 mb-2">{fund.realAmcName || fund.amc}</p>
                   <div className="flex gap-2 flex-wrap">
                     <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
                       {fund.scheme}
@@ -207,6 +207,22 @@ export default function FundExplorer() {
                   </div>
                 </div>
               </div>
+
+              {fund.factsheetLink && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <a
+                    href={fund.factsheetLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                    View Factsheet
+                  </a>
+                </div>
+              )}
             </div>
           ))}
         </div>
