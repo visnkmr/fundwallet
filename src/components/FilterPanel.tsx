@@ -16,15 +16,43 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
   const rangeValues = getRangeValues();
 
   const handleCheckboxChange = (category: keyof FundFilters, value: string) => {
-    const currentValues = filters[category] as string[] || [];
-    const newValues = currentValues.includes(value)
-      ? currentValues.filter(v => v !== value)
-      : [...currentValues, value];
+    // Handle different filter types appropriately
+    if (category === 'risk' || category === 'lockIn') {
+      // These are number arrays
+      const currentValues = (filters[category] as number[]) || [];
+      const numValue = parseInt(value);
+      const newValues = currentValues.includes(numValue)
+        ? currentValues.filter(v => v !== numValue)
+        : [...currentValues, numValue];
 
-    onFiltersChange({
-      ...filters,
-      [category]: newValues.length > 0 ? newValues : undefined
-    });
+      onFiltersChange({
+        ...filters,
+        [category]: newValues.length > 0 ? newValues : undefined
+      });
+    } else if (category === 'purchaseAllowed' || category === 'redemptionAllowed' || category === 'amcSipFlag') {
+      // These are boolean arrays
+      const currentValues = (filters[category] as boolean[]) || [];
+      const boolValue = value === 'true';
+      const newValues = currentValues.includes(boolValue)
+        ? currentValues.filter(v => v !== boolValue)
+        : [...currentValues, boolValue];
+
+      onFiltersChange({
+        ...filters,
+        [category]: newValues.length > 0 ? newValues : undefined
+      });
+    } else {
+      // Default string array handling
+      const currentValues = (filters[category] as string[]) || [];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter(v => v !== value)
+        : [...currentValues, value];
+
+      onFiltersChange({
+        ...filters,
+        [category]: newValues.length > 0 ? newValues : undefined
+      });
+    }
   };
 
   const handleSearchChange = (value: string) => {

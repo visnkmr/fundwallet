@@ -7,11 +7,26 @@ import FilterPanel from './FilterPanel';
 import FundList from './FundList';
 import FundCard from './FundCard';
 
+const STORAGE_KEY = 'fundwallet-filters';
+
 export default function FundExplorer() {
   const [allFunds] = useState<FundData[]>(getAllFunds());
   const [filterOptions] = useState(getFilterOptions());
   const [filteredFunds, setFilteredFunds] = useState<FundData[]>(allFunds);
   const [filters, setFilters] = useState<FundFilters>({});
+
+  // Load filters from local storage on client side only
+  useEffect(() => {
+    const storedFilters = loadFiltersFromStorage();
+    if (storedFilters) {
+      setFilters(storedFilters);
+    }
+  }, []);
+
+  // Save filters to local storage whenever they change
+  useEffect(() => {
+    saveFiltersToStorage(filters);
+  }, [filters]);
 
   useEffect(() => {
     let result = allFunds;
@@ -200,6 +215,96 @@ export default function FundExplorer() {
     }));
   };
 
+  // Save filters to local storage
+  const saveFiltersToStorage = (filters: FundFilters) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save filters to local storage:', error);
+    }
+  };
+
+  // Load filters from local storage
+  const loadFiltersFromStorage = (): FundFilters | null => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error('Failed to load filters from local storage:', error);
+      return null;
+    }
+  };
+
+  // Copy filters to clipboard as JSON
+  const copyFiltersToClipboard = () => {
+    try {
+      const filterJson = JSON.stringify(filters, null, 2);
+      navigator.clipboard.writeText(filterJson);
+      alert('Filters copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy filters:', error);
+      alert('Failed to copy filters');
+    }
+  };
+
+  // Paste filters from clipboard
+  const pasteFiltersFromClipboard = async () => {
+    try {
+      const clipboardText = await navigator.clipboard.readText();
+      const parsedFilters = JSON.parse(clipboardText);
+      setFilters(parsedFilters);
+      alert('Filters applied from clipboard!');
+    } catch (error) {
+      console.error('Failed to paste filters:', error);
+      alert('Failed to paste filters. Make sure the clipboard contains valid JSON.');
+    }
+  };
+
+  // Get active filter count and descriptions
+  const getActiveFiltersInfo = () => {
+    const activeFilters: string[] = [];
+
+    if (filters.search) activeFilters.push(`Search: "${filters.search}"`);
+    if (filters.amc?.length) activeFilters.push(`AMC: ${filters.amc.join(', ')}`);
+    if (filters.scheme?.length) activeFilters.push(`Scheme: ${filters.scheme.join(', ')}`);
+    if (filters.plan?.length) activeFilters.push(`Plan: ${filters.plan.join(', ')}`);
+    if (filters.dividendInterval?.length) activeFilters.push(`Dividend: ${filters.dividendInterval.join(', ')}`);
+    if (filters.risk?.length) {
+      const riskLabels = filters.risk.map(r => r === 1 ? 'Low' : r === 3 ? 'Medium' : r === 5 ? 'High' : `Risk ${r}`);
+      activeFilters.push(`Risk: ${riskLabels.join(', ')}`);
+    }
+    if (filters.settlementType?.length) activeFilters.push(`Settlement: ${filters.settlementType.join(', ')}`);
+    if (filters.purchaseAllowed?.length) {
+      const purchaseLabels = filters.purchaseAllowed.map(a => a ? 'Available' : 'Not Available');
+      activeFilters.push(`Purchase: ${purchaseLabels.join(', ')}`);
+    }
+    if (filters.redemptionAllowed?.length) {
+      const redemptionLabels = filters.redemptionAllowed.map(a => a ? 'Available' : 'Not Available');
+      activeFilters.push(`Redemption: ${redemptionLabels.join(', ')}`);
+    }
+    if (filters.amcSipFlag?.length) {
+      const sipLabels = filters.amcSipFlag.map(a => a ? 'Available' : 'Not Available');
+      activeFilters.push(`SIP: ${sipLabels.join(', ')}`);
+    }
+    if (filters.subScheme?.length) activeFilters.push(`Sub-scheme: ${filters.subScheme.join(', ')}`);
+    if (filters.lockIn?.length) activeFilters.push(`Lock-in: ${filters.lockIn.join(', ')} days`);
+    if (filters.manager?.length) activeFilters.push(`Manager: ${filters.manager.join(', ')}`);
+    if (filters.excludeStrings?.length) activeFilters.push(`Exclude: ${filters.excludeStrings.join(', ')}`);
+    if (filters.oneYearReturn) activeFilters.push(`1Y Return: ${filters.oneYearReturn[0]}% - ${filters.oneYearReturn[1]}%`);
+    if (filters.expenseRatioRange) activeFilters.push(`Expense Ratio: ${filters.expenseRatioRange[0]}% - ${filters.expenseRatioRange[1]}%`);
+    if (filters.exitLoadRange) activeFilters.push(`Exit Load: ${filters.exitLoadRange[0]}% - ${filters.exitLoadRange[1]}%`);
+    if (filters.aumRange) activeFilters.push(`AUM: ₹${(filters.aumRange[0]/10000000).toFixed(0)}Cr - ₹${(filters.aumRange[1]/10000000).toFixed(0)}Cr`);
+    if (filters.minInvestmentRange) activeFilters.push(`Min Investment: ₹${filters.minInvestmentRange[0].toLocaleString()} - ₹${filters.minInvestmentRange[1].toLocaleString()}`);
+    if (filters.navRange) activeFilters.push(`NAV: ₹${filters.navRange[0].toFixed(2)} - ₹${filters.navRange[1].toFixed(2)}`);
+    if (filters.launchYearRange) activeFilters.push(`Launch Year: ${filters.launchYearRange[0]} - ${filters.launchYearRange[1]}`);
+    if (filters.sort) activeFilters.push(`Sort: ${filters.sort.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`);
+
+    return {
+      count: activeFilters.length,
+      descriptions: activeFilters
+    };
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -220,6 +325,48 @@ export default function FundExplorer() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Active Filters Display */}
+        {(() => {
+          const activeFiltersInfo = getActiveFiltersInfo();
+          return activeFiltersInfo.count > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <h3 className="text-sm font-medium text-blue-800">
+                    Active Filters ({activeFiltersInfo.count})
+                  </h3>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {activeFiltersInfo.descriptions.map((desc, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      >
+                        {desc}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={copyFiltersToClipboard}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    title="Copy filters as JSON"
+                  >
+                    📋 Copy
+                  </button>
+                  <button
+                    onClick={pasteFiltersFromClipboard}
+                    className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                    title="Paste filters from JSON"
+                  >
+                    📄 Paste
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Filter Panel */}
         <FilterPanel
           filters={filters}
