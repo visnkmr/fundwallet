@@ -225,7 +225,7 @@ class FundDataProcessor {
 
     const funds = this.parseInstrumentsData();
 
-    const amcList = this.getUniqueValues(funds.map(f => f.amc));
+    const amcList = this.getUniqueValues(funds.map(f => f.realAmcName || f.amc));
     const schemeList = this.getUniqueValues(funds.map(f => f.scheme));
     const planList = this.getUniqueValues(funds.map(f => f.plan));
     const dividendIntervalList = this.getUniqueValues(funds.map(f => f.dividendInterval));
@@ -286,7 +286,8 @@ class FundDataProcessor {
 
     // Extract exit load percentages from exit load strings
     const exitLoads = funds.map(f => {
-      if (!f.exitLoad || f.exitLoad === "0" || f.exitLoad === "Nil" || f.exitLoad === "nil") return 0;
+      // If exit load is absent/null/undefined/empty, treat as 0
+      if (!f.exitLoad || f.exitLoad === "" || f.exitLoad === "0" || f.exitLoad === "Nil" || f.exitLoad === "nil") return 0;
 
       // Handle various exit load formats like "1%", "1.5%", "0.5% for 1 year", etc.
       const match = f.exitLoad.match(/(\d+\.?\d*)%/);
@@ -304,7 +305,7 @@ class FundDataProcessor {
         }
       }
       return 0;
-    }).filter(v => v !== null && v !== undefined && v !== 0);
+    }).filter(v => v !== null && v !== undefined);
 
     // Extract launch years
     const launchYears = funds.map(f => {

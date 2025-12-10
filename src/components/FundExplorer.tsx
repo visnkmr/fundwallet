@@ -63,7 +63,7 @@ export default function FundExplorer() {
 
     // Apply category filters
     if (filters.amc && filters.amc.length > 0) {
-      result = result.filter(fund => filters.amc!.includes(fund.amc));
+      result = result.filter(fund => filters.amc!.includes(fund.realAmcName || fund.amc));
     }
 
     if (filters.scheme && filters.scheme.length > 0) {
@@ -143,7 +143,10 @@ export default function FundExplorer() {
       result = result.filter(fund => {
         // Extract exit load percentage from string
         let exitLoadValue = 0;
-        if (fund.exitLoad && fund.exitLoad !== "0" && fund.exitLoad !== "Nil" && fund.exitLoad !== "nil") {
+        // If exit load is absent/null/undefined/empty, treat as 0
+        if (!fund.exitLoad || fund.exitLoad === "" || fund.exitLoad === "0" || fund.exitLoad === "Nil" || fund.exitLoad === "nil") {
+          exitLoadValue = 0;
+        } else {
           // Handle various exit load formats like "1%", "1.5%", "0.5% for 1 year", etc.
           const match = fund.exitLoad.match(/(\d+\.?\d*)%/);
           if (match) {
