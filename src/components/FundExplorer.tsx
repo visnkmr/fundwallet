@@ -18,8 +18,17 @@ export default function FundExplorer() {
   // Load filters from local storage on client side only
   useEffect(() => {
     const storedFilters = loadFiltersFromStorage();
-    if (storedFilters) {
+    if (storedFilters && Object.keys(storedFilters).length > 0) {
+      // Use stored filters if they exist
       setFilters(storedFilters);
+    } else {
+      // Set default filters if no stored filters exist
+      setFilters({
+        plan: ['Direct'],
+        dividendInterval: ['Growth'],
+        sort: 'cagr1y-desc',
+        purchaseAllowed: [true]
+      });
     }
   }, []);
 
@@ -134,9 +143,22 @@ export default function FundExplorer() {
       result = result.filter(fund => {
         // Extract exit load percentage from string
         let exitLoadValue = 0;
-        if (fund.exitLoad && fund.exitLoad !== "0" && fund.exitLoad !== "Nil") {
+        if (fund.exitLoad && fund.exitLoad !== "0" && fund.exitLoad !== "Nil" && fund.exitLoad !== "nil") {
+          // Handle various exit load formats like "1%", "1.5%", "0.5% for 1 year", etc.
           const match = fund.exitLoad.match(/(\d+\.?\d*)%/);
-          exitLoadValue = match ? parseFloat(match[1]) : 0;
+          if (match) {
+            exitLoadValue = parseFloat(match[1]);
+          } else {
+            // Try to extract any number that might be a percentage
+            const numMatch = fund.exitLoad.match(/(\d+\.?\d*)/);
+            if (numMatch) {
+              const num = parseFloat(numMatch[1]);
+              // If the number is between 0 and 100, assume it's a percentage
+              if (num >= 0 && num <= 100) {
+                exitLoadValue = num;
+              }
+            }
+          }
         }
         return exitLoadValue >= filters.exitLoadRange![0] &&
           exitLoadValue <= filters.exitLoadRange![1];
