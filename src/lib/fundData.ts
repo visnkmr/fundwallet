@@ -1,5 +1,5 @@
 import { FundData, FilterOptions, RangeValues } from '@/types/fund';
-// Import JSON data from external files
+// Import JSON data from external files (fallback)
 import uData from '../../u.json';
 import sData from '../../s.json';
 
@@ -87,12 +87,16 @@ class FundDataProcessor {
   };
 
   getInstrumentsDaily() {
-    let e = u.n9 || [];
+    // Use global data if available (from URL fetch), otherwise use local imports
+    const globalData = (globalThis as any).uData || uData;
+    let e = globalData.n9 || [];
     return e;
   }
 
   getInstrumentsMeta() {
-    let e = s.n9 || [];
+    // Use global data if available (from URL fetch), otherwise use local imports
+    const globalData = (globalThis as any).sData || sData;
+    let e = globalData.n9 || [];
     return e;
   }
 

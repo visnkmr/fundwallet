@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
 import { getAllFunds, getFilterOptions } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
@@ -8,15 +8,30 @@ import FundList from './FundList';
 import FundCard from './FundCard';
 
 const STORAGE_KEY = 'fundwallet-filters';
+const URL_STORAGE_KEY = 'fundwallet-urls';
 
 export default function FundExplorer() {
-  const [allFunds] = useState<FundData[]>(getAllFunds());
-  const [filterOptions] = useState(getFilterOptions());
-  const [filteredFunds, setFilteredFunds] = useState<FundData[]>(allFunds);
+  const [allFunds, setAllFunds] = useState<FundData[]>([]);
+  const [filterOptions, setFilterOptions] = useState<any>(null);
+  const [filteredFunds, setFilteredFunds] = useState<FundData[]>([]);
   const [filters, setFilters] = useState<FundFilters>({});
+  const [uUrl, setUUrl] = useState('https://example.com/u.json');
+  const [sUrl, setSUrl] = useState('https://example.com/s.json');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load filters from local storage on client side only
+  // Load URLs and filters from local storage on client side only
   useEffect(() => {
+    const storedUrls = loadUrlsFromStorage();
+    if (storedUrls) {
+      setUUrl(storedUrls.uUrl);
+      setSUrl(storedUrls.sUrl);
+    } else {
+      // Set default URLs if none stored
+      setUUrl('/u.json');
+      setSUrl('/s.json');
+    }
+
     const storedFilters = loadFiltersFromStorage();
     if (storedFilters && Object.keys(storedFilters).length > 0) {
       // Use stored filters if they exist
@@ -31,6 +46,13 @@ export default function FundExplorer() {
       });
     }
   }, []);
+
+  // Load data when URLs change
+  useEffect(() => {
+    if (uUrl && sUrl) {
+      fetchDataFromUrls();
+    }
+  }, [uUrl, sUrl]);
 
   // Save filters to local storage whenever they change
   useEffect(() => {
@@ -285,6 +307,93 @@ export default function FundExplorer() {
     }
   };
 
+  // Save URLs to local storage
+  const saveUrlsToStorage = (urls: { uUrl: string; sUrl: string }) => {
+    try {
+      localStorage.setItem(URL_STORAGE_KEY, JSON.stringify(urls));
+    } catch (error) {
+      console.error('Failed to save URLs to local storage:', error);
+    }
+  };
+
+  // Load URLs from local storage
+  const loadUrlsFromStorage = (): { uUrl: string; sUrl: string } | null => {
+    try {
+      const stored = localStorage.getItem(URL_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error('Failed to load URLs from local storage:', error);
+      return null;
+    }
+  };
+
+  // Fetch data from URLs
+  const fetchDataFromUrls = useCallback(async () => {
+    if (!uUrl || !sUrl) {
+      setError('Please provide both U and S data URLs');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Fetch both files in parallel
+      const [uResponse, sResponse] = await Promise.all([
+        fetch(uUrl),
+        fetch(sUrl)
+      ]);
+
+      if (!uResponse.ok || !sResponse.ok) {
+        throw new Error('Failed to fetch data files');
+      }
+
+      const [uData, sData] = await Promise.all([
+        uResponse.json(),
+        sResponse.json()
+      ]);
+
+      // Update the global data variables
+      (window as any).uData = uData;
+      (window as any).sData = sData;
+
+      // Clear the cache and reload data
+      const fundDataProcessor = (await import('@/lib/fundData')).fundDataProcessor;
+      fundDataProcessor.clearCache();
+
+      // Reload funds and filter options
+      const newFunds = (await import('@/lib/fundData')).getAllFunds();
+      const newFilterOptions = (await import('@/lib/fundData')).getFilterOptions();
+
+      setAllFunds(newFunds);
+      setFilterOptions(newFilterOptions);
+      setFilteredFunds(newFunds);
+
+      // Save URLs
+      saveUrlsToStorage({ uUrl, sUrl });
+
+    } catch (err) {
+      console.error('Data loading error:', err);
+      let errorMessage = 'Failed to load data';
+
+      if (err instanceof Error) {
+        if (err.message.includes('CORS')) {
+          errorMessage = 'CORS error: The server doesn\'t allow cross-origin requests. Make sure the server has CORS headers enabled.';
+        } else if (err.message.includes('fetch')) {
+          errorMessage = 'Network error: Unable to connect to the server. Check the URL and make sure the server is running.';
+        } else if (err.message.includes('JSON')) {
+          errorMessage = 'Invalid JSON: The data file contains invalid JSON format.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [uUrl, sUrl]);
+
   // Get active filter count and descriptions
   const getActiveFiltersInfo = () => {
     const activeFilters: string[] = [];
@@ -350,10 +459,74 @@ export default function FundExplorer() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Data Source Configuration */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-800 mb-3">Data Source URLs</h3>
+          <p className="text-xs text-gray-600 mb-3">
+            Enter URLs for your u.json and s.json data files. Note: URLs must allow cross-origin requests (CORS) or be served from the same domain.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">U Data URL (u.json)</label>
+              <input
+                type="url"
+                value={uUrl}
+                onChange={(e) => setUUrl(e.target.value)}
+                placeholder="https://example.com/u.json"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">S Data URL (s.json)</label>
+              <input
+                type="url"
+                value={sUrl}
+                onChange={(e) => setSUrl(e.target.value)}
+                placeholder="https://example.com/s.json"
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={fetchDataFromUrls}
+              disabled={isLoading}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-400 transition-colors"
+            >
+              {isLoading ? 'Loading...' : 'Load Data'}
+            </button>
+            {error && (
+              <div className="text-sm text-red-600 max-w-2xl">
+                <div className="font-medium mb-1">Error: {error}</div>
+                {error.includes('CORS') && (
+                  <div className="text-xs text-gray-600 mt-2">
+                    <strong>To fix CORS issues:</strong>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Serve your JSON files from the same domain as this app</li>
+                      <li>Or configure your server to allow CORS requests</li>
+                      <li>For development, you can use a proxy or disable CORS in your browser</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+              <span className="text-sm text-blue-800">Loading fund data...</span>
+            </div>
+          </div>
+        )}
+
         {/* Active Filters Display */}
         {(() => {
           const activeFiltersInfo = getActiveFiltersInfo();
-          return activeFiltersInfo.count > 0 && (
+          return activeFiltersInfo.count > 0 && !isLoading && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
               <div className="flex justify-between items-start mb-3">
                 <div>
@@ -393,11 +566,13 @@ export default function FundExplorer() {
         })()}
 
         {/* Filter Panel */}
-        <FilterPanel
-          filters={filters}
-          onFiltersChange={setFilters}
-          filterOptions={filterOptions}
-        />
+        {filterOptions && !isLoading && (
+          <FilterPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            filterOptions={filterOptions}
+          />
+        )}
 
         {/* Results Summary */}
         <div className="mb-6">
@@ -412,11 +587,13 @@ export default function FundExplorer() {
         </div>
 
         {/* Fund List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFunds.slice(0, 50).map((fund) => (
-            <FundCard fund={fund} onManagerClick={handleManagerSort}/>
-          ))}
-        </div>
+        {allFunds.length > 0 && !isLoading && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredFunds.slice(0, 50).map((fund) => (
+              <FundCard fund={fund} onManagerClick={handleManagerSort}/>
+            ))}
+          </div>
+        )}
 
         {filteredFunds.length > 50 && (
           <div className="text-center mt-8">
