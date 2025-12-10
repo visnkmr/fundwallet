@@ -50,6 +50,8 @@ export interface FilterOptions {
   risk: number[];
   minPurchaseAmt: number[];
   expenseRatio: number[];
+  launchYear: number[];
+  manager: string[];
 }
 
 export interface FundFilters {
@@ -67,6 +69,9 @@ export interface FundFilters {
   aumRange?: [number, number];
   minInvestmentRange?: [number, number];
   navRange?: [number, number];
+  launchYear?: number[];
+  manager?: string[];
+  sort?: string;
 }
 
 export interface RangeValues {

@@ -65,17 +65,37 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Search Funds</label>
-        <input
-          type="text"
-          placeholder="Search by fund name, AMC, or scheme..."
-          value={filters.search || ''}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-        />
-      </div>
+       {/* Search */}
+       <div className="mb-6">
+         <label className="block text-sm font-medium text-gray-700 mb-2">Search Funds</label>
+         <input
+           type="text"
+           placeholder="Search by fund name, AMC, or scheme..."
+           value={filters.search || ''}
+           onChange={(e) => handleSearchChange(e.target.value)}
+           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+         />
+       </div>
+
+       {/* Sort Options */}
+       <div className="mb-6">
+         <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+         <select
+           value={filters.sort || ''}
+           onChange={(e) => onFiltersChange({ ...filters, sort: e.target.value || undefined })}
+           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+         >
+           <option value="">Relevance</option>
+           <option value="cagr1y-asc">CAGR 1Y (Low to High)</option>
+           <option value="cagr1y-desc">CAGR 1Y (High to Low)</option>
+           <option value="minInvestment-asc">Min Investment (Low to High)</option>
+           <option value="minInvestment-desc">Min Investment (High to Low)</option>
+           <option value="exitLoad-asc">Exit Load (Low to High)</option>
+           <option value="exitLoad-desc">Exit Load (High to Low)</option>
+           <option value="expenseRatio-asc">Expense Ratio (Low to High)</option>
+           <option value="expenseRatio-desc">Expense Ratio (High to Low)</option>
+         </select>
+       </div>
 
       {isExpanded && (
         <>
@@ -227,25 +247,61 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
                 </div>
               </div>
 
-              {/* Risk Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
-                <div className="space-y-2 border border-gray-200 rounded-lg p-3">
-                  {filterOptions.risk?.map((risk: number) => (
-                    <label key={risk} className="flex items-center hover:bg-gray-50 p-1 rounded">
-                      <input
-                        type="checkbox"
-                        checked={filters.risk?.includes(risk) || false}
-                        onChange={() => handleCheckboxChange('risk', risk.toString())}
-                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {risk === 1 ? 'Low Risk' : risk === 3 ? 'Medium Risk' : risk === 5 ? 'High Risk' : `Risk ${risk}`}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+               {/* Risk Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
+                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.risk?.map((risk: number) => (
+                     <label key={risk} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.risk?.includes(risk) || false}
+                         onChange={() => handleCheckboxChange('risk', risk.toString())}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">
+                         {risk === 1 ? 'Low Risk' : risk === 3 ? 'Medium Risk' : risk === 5 ? 'High Risk' : `Risk ${risk}`}
+                       </span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Launch Year Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Launch Year</label>
+                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.launchYear?.sort((a: number, b: number) => b - a).map((year: number) => (
+                     <label key={year} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.launchYear?.includes(year) || false}
+                         onChange={() => handleCheckboxChange('launchYear', year.toString())}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{year}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
+
+               {/* Fund Manager Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Fund Manager</label>
+                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.manager?.sort().map((manager: string) => (
+                     <label key={manager} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={filters.manager?.includes(manager) || false}
+                         onChange={() => handleCheckboxChange('manager', manager)}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{manager}</span>
+                     </label>
+                   ))}
+                 </div>
+               </div>
             </div>
           </div>
         </>

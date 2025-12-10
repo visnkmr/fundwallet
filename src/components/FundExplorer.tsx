@@ -48,6 +48,17 @@ export default function FundExplorer() {
       result = result.filter(fund => filters.risk!.includes(fund.risk));
     }
 
+    if (filters.launchYear && filters.launchYear.length > 0) {
+      result = result.filter(fund => {
+        const launchYear = new Date(fund.launchDate).getFullYear();
+        return filters.launchYear!.includes(launchYear);
+      });
+    }
+
+    if (filters.manager && filters.manager.length > 0) {
+      result = result.filter(fund => filters.manager!.includes(fund.manager));
+    }
+
     // Apply range filters
     if (filters.minInvestmentRange) {
       result = result.filter(fund =>
@@ -95,6 +106,36 @@ export default function FundExplorer() {
         fund.aum >= filters.aumRange![0] &&
         fund.aum <= filters.aumRange![1]
       );
+    }
+
+    // Apply sorting
+    if (filters.sort) {
+      result = [...result].sort((a, b) => {
+        switch (filters.sort) {
+          case 'cagr1y-asc':
+            return a.oneYearPercent - b.oneYearPercent;
+          case 'cagr1y-desc':
+            return b.oneYearPercent - a.oneYearPercent;
+          case 'minInvestment-asc':
+            return a.minPurchaseAmt - b.minPurchaseAmt;
+          case 'minInvestment-desc':
+            return b.minPurchaseAmt - a.minPurchaseAmt;
+          case 'exitLoad-asc':
+            const aExitLoad = a.exitLoad && a.exitLoad !== "0" && a.exitLoad !== "Nil" ? parseFloat(a.exitLoad.match(/(\d+\.?\d*)%/)?.[1] || '0') : 0;
+            const bExitLoad = b.exitLoad && b.exitLoad !== "0" && b.exitLoad !== "Nil" ? parseFloat(b.exitLoad.match(/(\d+\.?\d*)%/)?.[1] || '0') : 0;
+            return aExitLoad - bExitLoad;
+          case 'exitLoad-desc':
+            const aExitLoadDesc = a.exitLoad && a.exitLoad !== "0" && a.exitLoad !== "Nil" ? parseFloat(a.exitLoad.match(/(\d+\.?\d*)%/)?.[1] || '0') : 0;
+            const bExitLoadDesc = b.exitLoad && b.exitLoad !== "0" && b.exitLoad !== "Nil" ? parseFloat(b.exitLoad.match(/(\d+\.?\d*)%/)?.[1] || '0') : 0;
+            return bExitLoadDesc - aExitLoadDesc;
+          case 'expenseRatio-asc':
+            return a.expenseRatio - b.expenseRatio;
+          case 'expenseRatio-desc':
+            return b.expenseRatio - a.expenseRatio;
+          default:
+            return 0;
+        }
+      });
     }
 
     setFilteredFunds(result);
@@ -151,7 +192,7 @@ export default function FundExplorer() {
               {filteredFunds.length} Funds Found
             </h2>
             <div className="text-sm text-gray-500">
-              Sorted by: Relevance
+              Sorted by: {filters.sort ? filters.sort.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Relevance'}
             </div>
           </div>
         </div>
@@ -163,9 +204,9 @@ export default function FundExplorer() {
           ))}
         </div>
 
-        {filteredFunds.length > 12 && (
+        {filteredFunds.length > 50 && (
           <div className="text-center mt-8">
-            <p className="text-gray-500">Showing first 12 results. Use filters to narrow down results.</p>
+            <p className="text-gray-500">Showing first 50 results. Use filters to narrow down results.</p>
           </div>
         )}
       </main>

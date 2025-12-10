@@ -210,6 +210,11 @@ class FundDataProcessor {
     const riskList = this.getUniqueValues(funds.map(f => f.risk));
     const minPurchaseAmtList = this.getUniqueValues(funds.map(f => f.minPurchaseAmt));
     const expenseRatioList = this.getUniqueValues(funds.map(f => f.expenseRatio));
+    const launchYearList = Array.from(new Set(funds.map(f => {
+      const date = new Date(f.launchDate);
+      return date.getFullYear();
+    }).filter(year => !isNaN(year))));
+    const managerList = this.getUniqueValues(funds.map(f => f.manager).filter(m => m && m.trim() !== ''));
 
     return {
       amc: amcList,
@@ -218,7 +223,9 @@ class FundDataProcessor {
       dividendInterval: dividendIntervalList,
       risk: riskList,
       minPurchaseAmt: minPurchaseAmtList,
-      expenseRatio: expenseRatioList
+      expenseRatio: expenseRatioList,
+      launchYear: launchYearList,
+      manager: managerList
     };
   }
 
