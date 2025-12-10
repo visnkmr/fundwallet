@@ -5,6 +5,7 @@ import { FundData, FundFilters } from '@/types/fund';
 import { getAllFunds, getFilterOptions } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
 import FundList from './FundList';
+import FundCard from './FundCard';
 
 export default function FundExplorer() {
   const [allFunds] = useState<FundData[]>(getAllFunds());
@@ -157,73 +158,8 @@ export default function FundExplorer() {
 
         {/* Fund List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFunds.slice(0, 12).map((fund) => (
-            <div key={fund.tradingSymbol} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-1">{fund.fund}</h3>
-                  <p className="text-sm text-gray-600 mb-2">{fund.realAmcName || fund.amc}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                      {fund.scheme}
-                    </span>
-                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                      {fund.plan}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-gray-800">{formatCurrency(fund.lastPrice)}</div>
-                  <div className={`text-sm font-medium ${getChangeColor(fund.changePercent)}`}>
-                    {formatPercent(fund.changePercent)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">1Y Return</p>
-                  <p className={`text-sm font-semibold ${getChangeColor(fund.oneYearPercent)}`}>
-                    {formatPercent(fund.oneYearPercent)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">AUM</p>
-                  <p className="text-sm font-semibold text-gray-700">
-                    ₹{(fund.aum / 10000000).toFixed(0)}Cr
-                  </p>
-                </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center text-sm">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Min Investment</p>
-                    <p className="font-medium text-gray-700">₹{fund.minPurchaseAmt.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Expense Ratio</p>
-                    <p className="font-medium text-gray-700">{fund.expenseRatio}%</p>
-                  </div>
-                </div>
-              </div>
-
-              {fund.factsheetLink && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <a
-                    href={fund.factsheetLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                    </svg>
-                    View Factsheet
-                  </a>
-                </div>
-              )}
-            </div>
+          {filteredFunds.slice(0, 50).map((fund) => (
+            <FundCard fund={fund}/>
           ))}
         </div>
 

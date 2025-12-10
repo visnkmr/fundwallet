@@ -1,4 +1,5 @@
 import { FundData } from '@/types/fund';
+import FundCard from './FundCard';
 
 interface FundListProps {
   funds: FundData[];
@@ -31,59 +32,60 @@ export default function FundList({ funds, loading = false }: FundListProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {funds.map((fund) => (
-        <div key={fund.tradingSymbol} className="fade-in">
-          {/* FundCard component would go here */}
-          <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-800 mb-1">{fund.fund}</h3>
-                <p className="text-sm text-gray-600 mb-2">{fund.amc}</p>
-                <div className="flex gap-2 flex-wrap">
-                  <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                    {fund.scheme}
-                  </span>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                    {fund.plan}
-                  </span>
-                </div>
-              </div>
-              <div className="text-right">
-                <div className="text-2xl font-bold text-gray-800">₹{fund.lastPrice.toFixed(2)}</div>
-                <div className={`text-sm font-medium ${fund.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {fund.changePercent >= 0 ? '+' : ''}{fund.changePercent.toFixed(2)}%
-                </div>
-              </div>
-            </div>
+        // <div key={fund.tradingSymbol} className="fade-in">
+        //   {/* FundCard component would go here */}
+        //   <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+        //     <div className="flex justify-between items-start mb-4">
+        //       <div className="flex-1">
+        //         <h3 className="text-lg font-semibold text-gray-800 mb-1">{fund.fund}</h3>
+        //         <p className="text-sm text-gray-600 mb-2">{fund.amc}</p>
+        //         <div className="flex gap-2 flex-wrap">
+        //           <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+        //             {fund.scheme}
+        //           </span>
+        //           <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
+        //             {fund.plan}
+        //           </span>
+        //         </div>
+        //       </div>
+        //       <div className="text-right">
+        //         <div className="text-2xl font-bold text-gray-800">₹{fund.lastPrice.toFixed(2)}</div>
+        //         <div className={`text-sm font-medium ${fund.changePercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        //           {fund.changePercent >= 0 ? '+' : ''}{fund.changePercent.toFixed(2)}%
+        //         </div>
+        //       </div>
+        //     </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">1Y Return</p>
-                <p className={`text-sm font-semibold ${fund.oneYearPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {fund.oneYearPercent >= 0 ? '+' : ''}{fund.oneYearPercent.toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">AUM</p>
-                <p className="text-sm font-semibold text-gray-700">
-                  ₹{(fund.aum / 10000000).toFixed(0)}Cr
-                </p>
-              </div>
-            </div>
+        //     <div className="grid grid-cols-2 gap-4 mb-4">
+        //       <div>
+        //         <p className="text-xs text-gray-500 mb-1">1Y Return</p>
+        //         <p className={`text-sm font-semibold ${fund.oneYearPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        //           {fund.oneYearPercent >= 0 ? '+' : ''}{fund.oneYearPercent.toFixed(2)}%
+        //         </p>
+        //       </div>
+        //       <div>
+        //         <p className="text-xs text-gray-500 mb-1">AUM</p>
+        //         <p className="text-sm font-semibold text-gray-700">
+        //           ₹{(fund.aum / 10000000).toFixed(0)}Cr
+        //         </p>
+        //       </div>
+        //     </div>
 
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center text-sm">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Min Investment</p>
-                  <p className="font-medium text-gray-700">₹{fund.minPurchaseAmt.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Expense Ratio</p>
-                  <p className="font-medium text-gray-700">{fund.expenseRatio}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        //     <div className="border-t pt-4">
+        //       <div className="flex justify-between items-center text-sm">
+        //         <div>
+        //           <p className="text-xs text-gray-500 mb-1">Min Investment</p>
+        //           <p className="font-medium text-gray-700">₹{fund.minPurchaseAmt.toLocaleString()}</p>
+        //         </div>
+        //         <div>
+        //           <p className="text-xs text-gray-500 mb-1">Expense Ratio</p>
+        //           <p className="font-medium text-gray-700">{fund.expenseRatio}%</p>
+        //         </div>
+        //       </div>
+        //     </div>
+        //   </div>
+        // </div>
+        <FundCard fund={fund} />
       ))}
     </div>
   );
