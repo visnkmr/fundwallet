@@ -34,6 +34,14 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
     });
   };
 
+  const handleExcludeChange = (value: string) => {
+    const excludeStrings = value ? value.split(',').map(s => s.trim()).filter(s => s.length > 0) : undefined;
+    onFiltersChange({
+      ...filters,
+      excludeStrings
+    });
+  };
+
   const handleRangeChange = (category: keyof FundFilters, value: [number, number]) => {
     onFiltersChange({
       ...filters,
@@ -75,6 +83,19 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions }:
            onChange={(e) => handleSearchChange(e.target.value)}
            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
          />
+       </div>
+
+       {/* Exclude Filter */}
+       <div className="mb-6">
+         <label className="block text-sm font-medium text-gray-700 mb-2">Exclude Funds</label>
+         <input
+           type="text"
+           placeholder="Enter strings to exclude (comma-separated, e.g., 'bonus, dividend')"
+           value={filters.excludeStrings ? filters.excludeStrings.join(', ') : ''}
+           onChange={(e) => handleExcludeChange(e.target.value)}
+           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         />
+         <p className="text-xs text-gray-500 mt-1">Funds containing these strings in their name will be hidden</p>
        </div>
 
        {/* Sort Options */}

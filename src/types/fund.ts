@@ -72,6 +72,7 @@ export interface FundFilters {
   launchYear?: number[];
   manager?: string[];
   sort?: string;
+  excludeStrings?: string[];
 }
 
 export interface RangeValues {

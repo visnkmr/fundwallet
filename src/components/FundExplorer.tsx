@@ -27,6 +27,16 @@ export default function FundExplorer() {
       );
     }
 
+    // Apply exclude filter
+    if (filters.excludeStrings && filters.excludeStrings.length > 0) {
+      result = result.filter(fund => {
+        const fundNameLower = fund.fundLowerCase;
+        return !filters.excludeStrings!.some(excludeString =>
+          fundNameLower.includes(excludeString.toLowerCase())
+        );
+      });
+    }
+
     // Apply category filters
     if (filters.amc && filters.amc.length > 0) {
       result = result.filter(fund => filters.amc!.includes(fund.amc));
