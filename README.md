@@ -116,3 +116,12 @@ Users can filter funds by:
 ## License
 
 This project is open source and available under the [MIT License](LICENSE).
+
+
+## Self notes
+
+s.json data:
+amc, fund, minPurchaseAmt, purchaseAmtMulti, minAdditionalPurchaseAmt, minRedemptionQty, redemptionQtyMulti, dividendType, dividendInterval, scheme, subScheme, plan, settlementType, launchDate, exitLoad, exitLoadSlab, expenseRatio, amcSipFlag, manager, lockIn, risk
+
+u.json data:
+tradingSymbol, purchaseAllowed, redemptionAllowed, lastDividendDate, lastDividendPercent, lastPrice, lastPriceDate, changePercent, oneYearPercent, twoYearPercent, threeYearPercent, fourYearPercent, fiveYearPercent, aum, factsheetLink, realAmcName
