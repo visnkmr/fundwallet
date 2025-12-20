@@ -58,13 +58,11 @@ export default function FundExplorer() {
 
     // Apply search filter
     if (filters.search) {
-      const searchLower = filters.search.toLowerCase();
-      result = result.filter(fund =>
-        fund.fundLowerCase.includes(searchLower) ||
-        fund.amc.toLowerCase().includes(searchLower) ||
-        fund.scheme.toLowerCase().includes(searchLower) ||
-        fund.manager.toLowerCase().includes(searchLower)
-      );
+      const searchTerms = filters.search.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+      result = result.filter(fund => {
+        const fundText = (fund.fundLowerCase + ' ' + fund.amc.toLowerCase() + ' ' + fund.scheme.toLowerCase() + ' ' + fund.manager.toLowerCase()).toLowerCase();
+        return searchTerms.every(term => fundText.includes(term));
+      });
     }
 
     // Apply exclude filter
