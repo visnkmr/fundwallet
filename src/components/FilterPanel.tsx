@@ -14,6 +14,8 @@ interface FilterPanelProps {
 
 export default function FilterPanel({ filters, onFiltersChange, filterOptions, rangeValues }: FilterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
+  const [amcSearch, setAmcSearch] = useState('');
+  const [managerSearch, setManagerSearch] = useState('');
 
   const handleCheckboxChange = (category: keyof FundFilters, value: string) => {
     // Handle different filter types appropriately
@@ -235,11 +237,18 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-4 pb-2 border-b">Category Filters</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* AMC Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">AMC</label>
-                <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                   {filterOptions.amc?.sort().map((amc: string) => (
+               {/* AMC Filter */}
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-2">AMC</label>
+                 <input
+                   type="text"
+                   placeholder="Search AMC..."
+                   value={amcSearch}
+                   onChange={(e) => setAmcSearch(e.target.value)}
+                   className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                 />
+                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                   {filterOptions.amc?.sort().filter((amc: string) => amc.toLowerCase().includes(amcSearch.toLowerCase())).map((amc: string) => (
                     <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
                       <input
                         type="checkbox"
@@ -329,11 +338,18 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
 
 
 
-               {/* Fund Manager Filter */}
-               <div>
-                 <label className="block text-sm font-medium text-gray-700 mb-2">Fund Manager</label>
-                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                   {filterOptions.manager?.sort().map((manager: string) => (
+                {/* Fund Manager Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fund Manager</label>
+                  <input
+                    type="text"
+                    placeholder="Search Fund Manager..."
+                    value={managerSearch}
+                    onChange={(e) => setManagerSearch(e.target.value)}
+                    className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                    {filterOptions.manager?.sort().filter((manager: string) => manager.toLowerCase().includes(managerSearch.toLowerCase())).map((manager: string) => (
                      <label key={manager} className="flex items-center hover:bg-gray-50 p-1 rounded">
                        <input
                          type="checkbox"
