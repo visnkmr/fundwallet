@@ -2,3 +2,7 @@
 node_modules/
 out/
 bun.lock
+u.json
+tsconfig.tsbuildinfo
+s.json
+data.b64

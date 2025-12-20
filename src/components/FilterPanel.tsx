@@ -239,7 +239,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">AMC</label>
                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                  {filterOptions.amc?.map((amc: string) => (
+                   {filterOptions.amc?.sort().map((amc: string) => (
                     <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
                       <input
                         type="checkbox"
@@ -257,7 +257,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Scheme Type</label>
                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                  {filterOptions.scheme?.map((scheme: string) => (
+                   {filterOptions.scheme?.sort().map((scheme: string) => (
                     <label key={scheme} className="flex items-center hover:bg-gray-50 p-1 rounded">
                       <input
                         type="checkbox"
@@ -275,7 +275,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
                 <div className="space-y-2 border border-gray-200 rounded-lg p-3">
-                  {filterOptions.plan?.map((plan: string) => (
+                   {filterOptions.plan?.sort().map((plan: string) => (
                     <label key={plan} className="flex items-center hover:bg-gray-50 p-1 rounded">
                       <input
                         type="checkbox"
@@ -293,7 +293,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Dividend Interval</label>
                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                  {filterOptions.dividendInterval?.map((interval: string) => (
+                   {filterOptions.dividendInterval?.sort().map((interval: string) => (
                     <label key={interval} className="flex items-center hover:bg-gray-50 p-1 rounded">
                       <input
                         type="checkbox"
@@ -311,7 +311,7 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-2">Risk Level</label>
                  <div className="space-y-2 border border-gray-200 rounded-lg p-3">
-                   {filterOptions.risk?.map((risk: number) => (
+                    {filterOptions.risk?.sort((a: number, b: number) => a - b).map((risk: number) => (
                      <label key={risk} className="flex items-center hover:bg-gray-50 p-1 rounded">
                        <input
                          type="checkbox"
