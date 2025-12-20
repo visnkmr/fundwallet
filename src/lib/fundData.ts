@@ -207,7 +207,7 @@ class FundDataProcessor {
         a.aum = 10000000 * (e[13] as number);
         a.amc = u[1] as string;
 
-        const amcData = fcMap.get(a.amc);
+        const amcData = fcMap.get(a.amc) as {link: string, name: string} | undefined;
         if (amcData) {
           a.realAmcName = amcData.name;
           a.factsheetLink = amcData.link;
