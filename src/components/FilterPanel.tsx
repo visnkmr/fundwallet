@@ -9,11 +9,11 @@ interface FilterPanelProps {
   filters: FundFilters;
   onFiltersChange: (filters: FundFilters) => void;
   filterOptions: any;
+  rangeValues: any;
 }
 
-export default function FilterPanel({ filters, onFiltersChange, filterOptions }: FilterPanelProps) {
+export default function FilterPanel({ filters, onFiltersChange, filterOptions, rangeValues }: FilterPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
-  const rangeValues = getRangeValues();
 
   const handleCheckboxChange = (category: keyof FundFilters, value: string) => {
     // Handle different filter types appropriately

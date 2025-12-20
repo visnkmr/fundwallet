@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
-import { getAllFunds, getFilterOptions } from '@/lib/fundData';
+import { getAllFunds, getFilterOptions, getRangeValues } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
 import FundList from './FundList';
 import FundCard from './FundCard';
@@ -10,13 +10,29 @@ import FundCard from './FundCard';
 const STORAGE_KEY = 'fundwallet-filters';
 
 export default function FundExplorer() {
-  const [allFunds] = useState<FundData[]>(getAllFunds());
-  const [filterOptions] = useState(getFilterOptions());
-  const [filteredFunds, setFilteredFunds] = useState<FundData[]>(allFunds);
+  const [allFunds, setAllFunds] = useState<FundData[]>([]);
+  const [filterOptions, setFilterOptions] = useState<any>(null);
+  const [rangeValues, setRangeValues] = useState<any>(null);
+  const [filteredFunds, setFilteredFunds] = useState<FundData[]>([]);
   const [filters, setFilters] = useState<FundFilters>({});
+
+  // Load data
+  useEffect(() => {
+    async function loadData() {
+      const funds = await getAllFunds();
+      const options = await getFilterOptions();
+      const ranges = await getRangeValues();
+      setAllFunds(funds);
+      setFilterOptions(options);
+      setRangeValues(ranges);
+      setFilteredFunds(funds);
+    }
+    loadData();
+  }, []);
 
   // Load filters from local storage on client side only
   useEffect(() => {
+    if (allFunds.length === 0) return;
     const storedFilters = loadFiltersFromStorage();
     if (storedFilters && Object.keys(storedFilters).length > 0) {
       // Use stored filters if they exist
@@ -393,11 +409,14 @@ export default function FundExplorer() {
         })()}
 
         {/* Filter Panel */}
-        <FilterPanel
-          filters={filters}
-          onFiltersChange={setFilters}
-          filterOptions={filterOptions}
-        />
+        {rangeValues && filterOptions && (
+          <FilterPanel
+            filters={filters}
+            onFiltersChange={setFilters}
+            filterOptions={filterOptions}
+            rangeValues={rangeValues}
+          />
+        )}
 
         {/* Results Summary */}
         <div className="mb-6">

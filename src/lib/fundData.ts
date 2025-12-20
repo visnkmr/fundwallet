@@ -1,16 +1,46 @@
 import { FundData, FilterOptions, RangeValues } from '@/types/fund';
-// Import JSON data from external files
-import uData from '../../u.json';
-import sData from '../../s.json';
 
 // Helper function from the original export_amc_data.js
 const l = {
   qz: (str: string) => String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-')
 };
 
-// Use imported data instead of embedded JSON
-const u = uData;
-const s = sData;
+// Data loading from URL
+const key = new TextEncoder().encode('0123456789abcdef0123456789abcdef');
+
+async function loadDataFromUrl(url: string): Promise<{u: any, s: any}> {
+  const response = await fetch(url);
+  const base64 = await response.text();
+  const encryptedWithTag = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  const iv = encryptedWithTag.slice(0, 16);
+  const encrypted = encryptedWithTag.slice(16, -16);
+  const authTag = encryptedWithTag.slice(-16);
+  const keyBuffer = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
+  const algorithm = { name: 'AES-GCM', iv: iv, tagLength: 128 };
+  const decrypted = await crypto.subtle.decrypt(algorithm, keyBuffer, new Uint8Array([...encrypted, ...authTag]));
+  const decompressedResponse = new Response(decrypted);
+  const decompressed = await decompressedResponse.arrayBuffer();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(decompressed));
+      controller.close();
+    }
+  }).pipeThrough(new DecompressionStream('gzip'));
+  const decompressedBlob = await new Response(stream).blob();
+  const jsonString = await decompressedBlob.text();
+  const combined = JSON.parse(jsonString);
+  return { u: combined.u, s: combined.s };
+}
+
+let dataCache: {u: any, s: any} | null = null;
+
+async function getData(): Promise<{u: any, s: any}> {
+  if (dataCache) return dataCache;
+  // TODO: Replace with actual URL after uploading to jsdelivr
+  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+  dataCache = await loadDataFromUrl(url);
+  return dataCache;
+}
 
 class FundDataProcessor {
   private cachedFunds: FundData[] | null = null;
@@ -86,19 +116,22 @@ class FundDataProcessor {
     "dividend reinvest": "Dividend reinvest"
   };
 
-  getInstrumentsDaily() {
-    let e = u.n9 || [];
+  async getInstrumentsDaily() {
+    const data = await getData();
+    let e = data.u.n9 || [];
     return e;
   }
 
-  getInstrumentsMeta() {
-    let e = s.n9 || [];
+  async getInstrumentsMeta() {
+    const data = await getData();
+    let e = data.s.n9 || [];
     return e;
   }
 
-  getFactsheetData() {
+  async getFactsheetData() {
+    const data = await getData();
     // @ts-ignore
-    return u.FC || [];
+    return data.u.FC || [];
   }
 
   stripPlanName(e: string) {
@@ -134,7 +167,7 @@ class FundDataProcessor {
     return Array.from(new Set(e));
   }
 
-  parseInstrumentsData(): FundData[] {
+  async parseInstrumentsData(): Promise<FundData[]> {
     // Return cached data if available
     if (this.cachedFunds !== null) {
       console.log('Using cached fund data');
@@ -143,9 +176,9 @@ class FundDataProcessor {
 
     console.log('Parsing fund data from JSON...');
 
-    let e = this.getInstrumentsDaily();
-    let t = this.getInstrumentsMeta();
-    let fc = this.getFactsheetData();
+    let e = await this.getInstrumentsDaily();
+    let t = await this.getInstrumentsMeta();
+    let fc = await this.getFactsheetData();
     let fcMap = new Map(fc.map((item: any) => [item[0], { link: item[1], name: item[2] }]));
     let n: FundData[] = [];
     let i: string[] = [];
@@ -214,7 +247,7 @@ class FundDataProcessor {
     return n;
   }
 
-  getFilterOptions(): FilterOptions {
+  async getFilterOptions(): Promise<FilterOptions> {
     // Return cached filter options if available
     if (this.cachedFilterOptions !== null) {
       console.log('Using cached filter options');
@@ -223,7 +256,7 @@ class FundDataProcessor {
 
     console.log('Generating filter options...');
 
-    const funds = this.parseInstrumentsData();
+    const funds = await this.parseInstrumentsData();
 
     const amcList = this.getUniqueValues(funds.map(f => f.realAmcName || f.amc));
     const schemeList = this.getUniqueValues(funds.map(f => f.scheme));
@@ -267,7 +300,7 @@ class FundDataProcessor {
     return filterOptions;
   }
 
-  getRangeValues(): RangeValues {
+  async getRangeValues(): Promise<RangeValues> {
     // Return cached range values if available
     if (this.cachedRangeValues !== null) {
       console.log('Using cached range values');
@@ -276,7 +309,7 @@ class FundDataProcessor {
 
     console.log('Calculating range values...');
 
-    const funds = this.parseInstrumentsData();
+    const funds = await this.parseInstrumentsData();
 
     const oneYearReturns = funds.map(f => f.oneYearPercent).filter(v => v !== null && v !== undefined);
     const expenseRatios = funds.map(f => f.expenseRatio).filter(v => v !== null && v !== undefined);
@@ -358,6 +391,6 @@ class FundDataProcessor {
 }
 
 export const fundDataProcessor = new FundDataProcessor();
-export const getAllFunds = () => fundDataProcessor.parseInstrumentsData();
-export const getFilterOptions = () => fundDataProcessor.getFilterOptions();
-export const getRangeValues = () => fundDataProcessor.getRangeValues();
+export const getAllFunds = async () => await fundDataProcessor.parseInstrumentsData();
+export const getFilterOptions = async () => await fundDataProcessor.getFilterOptions();
+export const getRangeValues = async () => await fundDataProcessor.getRangeValues();
