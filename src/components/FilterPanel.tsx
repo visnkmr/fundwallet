@@ -16,6 +16,8 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
   const [isExpanded, setIsExpanded] = useState(true);
   const [amcSearch, setAmcSearch] = useState('');
   const [managerSearch, setManagerSearch] = useState('');
+  const [selectAllAmc, setSelectAllAmc] = useState(true);
+  const [selectAllManager, setSelectAllManager] = useState(true);
 
   const handleCheckboxChange = (category: keyof FundFilters, value: string) => {
     // Handle different filter types appropriately
@@ -240,25 +242,42 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                {/* AMC Filter */}
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-2">AMC</label>
-                 <input
-                   type="text"
-                   placeholder="Search AMC..."
-                   value={amcSearch}
-                   onChange={(e) => setAmcSearch(e.target.value)}
-                   className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                 />
-                 <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                   {filterOptions.amc?.sort().filter((amc: string) => amc.toLowerCase().includes(amcSearch.toLowerCase())).map((amc: string) => (
-                    <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
-                      <input
-                        type="checkbox"
-                        checked={filters.amc?.includes(amc) || false}
-                        onChange={() => handleCheckboxChange('amc', amc)}
-                        className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">{amc}</span>
-                    </label>
-                  ))}
+                  <input
+                    type="text"
+                    placeholder="Search AMC..."
+                    value={amcSearch}
+                    onChange={(e) => setAmcSearch(e.target.value)}
+                    className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  />
+                  <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
+                    <input
+                      type="checkbox"
+                      checked={selectAllAmc}
+                      onChange={(e) => {
+                        setSelectAllAmc(e.target.checked);
+                        if (e.target.checked) {
+                          onFiltersChange({ ...filters, amc: undefined });
+                        } else {
+                          onFiltersChange({ ...filters, amc: filterOptions.amc });
+                        }
+                      }}
+                      className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Select All AMCs</span>
+                  </label>
+                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                    {filterOptions.amc?.sort().filter((amc: string) => amc.toLowerCase().includes(amcSearch.toLowerCase())).map((amc: string) => (
+                     <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                       <input
+                         type="checkbox"
+                         checked={selectAllAmc || (filters.amc?.includes(amc) || false)}
+                         onChange={() => { if (!selectAllAmc) { handleCheckboxChange('amc', amc); } }}
+                         disabled={selectAllAmc}
+                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                       />
+                       <span className="text-sm text-gray-700">{amc}</span>
+                     </label>
+                   ))}
                 </div>
               </div>
 
@@ -348,13 +367,30 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                     onChange={(e) => setManagerSearch(e.target.value)}
                     className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
+                  <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
+                    <input
+                      type="checkbox"
+                      checked={selectAllManager}
+                      onChange={(e) => {
+                        setSelectAllManager(e.target.checked);
+                        if (e.target.checked) {
+                          onFiltersChange({ ...filters, manager: undefined });
+                        } else {
+                          onFiltersChange({ ...filters, manager: filterOptions.manager });
+                        }
+                      }}
+                      className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Select All Fund Managers</span>
+                  </label>
                   <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
                     {filterOptions.manager?.sort().filter((manager: string) => manager.toLowerCase().includes(managerSearch.toLowerCase())).map((manager: string) => (
                      <label key={manager} className="flex items-center hover:bg-gray-50 p-1 rounded">
                        <input
                          type="checkbox"
-                         checked={filters.manager?.includes(manager) || false}
-                         onChange={() => handleCheckboxChange('manager', manager)}
+                         checked={selectAllManager || (filters.manager?.includes(manager) || false)}
+                         onChange={() => { if (!selectAllManager) { handleCheckboxChange('manager', manager); } }}
+                         disabled={selectAllManager}
                          className="mr-2 rounded text-blue-500 focus:ring-blue-500"
                        />
                        <span className="text-sm text-gray-700">{manager}</span>
