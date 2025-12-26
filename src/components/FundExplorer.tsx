@@ -15,17 +15,33 @@ export default function FundExplorer() {
   const [rangeValues, setRangeValues] = useState<any>(null);
   const [filteredFunds, setFilteredFunds] = useState<FundData[]>([]);
   const [filters, setFilters] = useState<FundFilters>({});
+  const [loading, setLoading] = useState(true);
+  const [loadingPhase, setLoadingPhase] = useState('');
+  const [loadingPercent, setLoadingPercent] = useState(0);
 
   // Load data
   useEffect(() => {
     async function loadData() {
-      const funds = await getAllFunds();
-      const options = await getFilterOptions();
-      const ranges = await getRangeValues();
+      setLoading(true);
+      setLoadingPhase('Initializing...');
+      setLoadingPercent(0);
+      const funds = await getAllFunds((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const options = await getFilterOptions((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const ranges = await getRangeValues((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
       setAllFunds(funds);
       setFilterOptions(options);
       setRangeValues(ranges);
       setFilteredFunds(funds);
+      setLoading(false);
     }
     loadData();
   }, []);
@@ -343,6 +359,29 @@ export default function FundExplorer() {
       descriptions: activeFilters
     };
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-4">
+          <div className="text-center">
+            <div className="mb-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Loading Fund Data</h2>
+            <p className="text-gray-600 mb-4">{loadingPhase}</p>
+            <div className="w-full bg-gray-200 rounded-full h-2.5 mb-2">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${loadingPercent}%` }}
+              ></div>
+            </div>
+            <p className="text-sm text-gray-500">{loadingPercent}% complete</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

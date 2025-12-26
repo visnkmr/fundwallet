@@ -8,9 +8,34 @@ const l = {
 // Data loading from URL
 const key = new TextEncoder().encode('0123456789abcdef0123456789abcdef');
 
-async function loadDataFromUrl(url: string): Promise<{u: any, s: any}> {
+async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
+  onProgress?.('Downloading data...', 0);
   const response = await fetch(url);
-  const base64 = await response.text();
+  const contentLength = parseInt(response.headers.get('content-length') || '0');
+  const reader = response.body?.getReader();
+  let received = 0;
+  const chunks: Uint8Array[] = [];
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (contentLength > 0) {
+        onProgress?.('Downloading data...', Math.round((received / contentLength) * 100));
+      }
+    }
+  }
+  // Concatenate chunks
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const concatenated = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    concatenated.set(chunk, offset);
+    offset += chunk.length;
+  }
+  const base64 = new TextDecoder().decode(concatenated);
+  onProgress?.('Decrypting data...', 0);
   const encryptedWithTag = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   const iv = encryptedWithTag.slice(0, 16);
   const encrypted = encryptedWithTag.slice(16, -16);
@@ -18,6 +43,7 @@ async function loadDataFromUrl(url: string): Promise<{u: any, s: any}> {
   const keyBuffer = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
   const algorithm = { name: 'AES-GCM', iv: iv, tagLength: 128 };
   const decrypted = await crypto.subtle.decrypt(algorithm, keyBuffer, new Uint8Array([...encrypted, ...authTag]));
+  onProgress?.('Decompressing data...', 0);
   const decompressedResponse = new Response(decrypted);
   const decompressed = await decompressedResponse.arrayBuffer();
   const stream = new ReadableStream({
@@ -27,18 +53,20 @@ async function loadDataFromUrl(url: string): Promise<{u: any, s: any}> {
     }
   }).pipeThrough(new DecompressionStream('gzip'));
   const decompressedBlob = await new Response(stream).blob();
+  onProgress?.('Parsing JSON...', 0);
   const jsonString = await decompressedBlob.text();
   const combined = JSON.parse(jsonString);
+  onProgress?.('Data loaded', 100);
   return { u: combined.u, s: combined.s };
 }
 
 let dataCache: {u: any, s: any} | null = null;
 
-async function getData(): Promise<{u: any, s: any}> {
+async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
   if (dataCache) return dataCache;
   // TODO: Replace with actual URL after uploading to jsdelivr
   const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
-  dataCache = await loadDataFromUrl(url);
+  dataCache = await loadDataFromUrl(url, onProgress);
   return dataCache;
 }
 
@@ -116,20 +144,20 @@ class FundDataProcessor {
     "dividend reinvest": "Dividend reinvest"
   };
 
-  async getInstrumentsDaily() {
-    const data = await getData();
+  async getInstrumentsDaily(onProgress?: (phase: string, percent: number) => void) {
+    const data = await getData(onProgress);
     let e = data.u.n9 || [];
     return e;
   }
 
-  async getInstrumentsMeta() {
-    const data = await getData();
+  async getInstrumentsMeta(onProgress?: (phase: string, percent: number) => void) {
+    const data = await getData(onProgress);
     let e = data.s.n9 || [];
     return e;
   }
 
-  async getFactsheetData() {
-    const data = await getData();
+  async getFactsheetData(onProgress?: (phase: string, percent: number) => void) {
+    const data = await getData(onProgress);
     // @ts-ignore
     return data.u.FC || [];
   }
@@ -167,24 +195,30 @@ class FundDataProcessor {
     return Array.from(new Set(e));
   }
 
-  async parseInstrumentsData(): Promise<FundData[]> {
+  async parseInstrumentsData(onProgress?: (phase: string, percent: number) => void): Promise<FundData[]> {
     // Return cached data if available
     if (this.cachedFunds !== null) {
       console.log('Using cached fund data');
+      onProgress?.('Using cached data', 100);
       return this.cachedFunds;
     }
 
     console.log('Parsing fund data from JSON...');
+    onProgress?.('Fetching instruments data...', 0);
 
-    let e = await this.getInstrumentsDaily();
+    let e = await this.getInstrumentsDaily((phase, percent) => onProgress?.(phase, percent));
+    onProgress?.('Fetching meta data...', 10);
     let t = await this.getInstrumentsMeta();
+    onProgress?.('Fetching factsheet data...', 20);
     let fc = await this.getFactsheetData();
     let fcMap = new Map(fc.map((item: any) => [item[0], { link: item[1], name: item[2] }]));
     let n: FundData[] = [];
     let i: string[] = [];
     let d = new Map(t.map((item: any) => [item[0], true]));
 
-    e.map((e: any[]) => {
+    onProgress?.('Processing fund data...', 30);
+    const total = e.length;
+    e.forEach((e: any[], index: number) => {
       let a = {} as FundData;
       let r = e[0];
       if (d.has(r)) {
@@ -240,23 +274,29 @@ class FundDataProcessor {
         i.push(a.dividendInterval);
         n.push(a);
       }
+      if (index % 100 === 0) {
+        onProgress?.('Processing fund data...', 30 + Math.round((index / total) * 70));
+      }
     });
 
+    onProgress?.('Data processed', 100);
     // Cache the parsed data
     this.cachedFunds = n;
     return n;
   }
 
-  async getFilterOptions(): Promise<FilterOptions> {
+  async getFilterOptions(onProgress?: (phase: string, percent: number) => void): Promise<FilterOptions> {
     // Return cached filter options if available
     if (this.cachedFilterOptions !== null) {
       console.log('Using cached filter options');
+      onProgress?.('Filter options ready', 100);
       return this.cachedFilterOptions;
     }
 
     console.log('Generating filter options...');
+    onProgress?.('Generating filter options...', 0);
 
-    const funds = await this.parseInstrumentsData();
+    const funds = await this.parseInstrumentsData(onProgress);
 
     const amcList = this.getUniqueValues(funds.map(f => f.realAmcName || f.amc));
     const schemeList = this.getUniqueValues(funds.map(f => f.scheme));
@@ -300,16 +340,18 @@ class FundDataProcessor {
     return filterOptions;
   }
 
-  async getRangeValues(): Promise<RangeValues> {
+  async getRangeValues(onProgress?: (phase: string, percent: number) => void): Promise<RangeValues> {
     // Return cached range values if available
     if (this.cachedRangeValues !== null) {
       console.log('Using cached range values');
+      onProgress?.('Range values ready', 100);
       return this.cachedRangeValues;
     }
 
     console.log('Calculating range values...');
+    onProgress?.('Calculating range values...', 0);
 
-    const funds = await this.parseInstrumentsData();
+    const funds = await this.parseInstrumentsData(onProgress);
 
     const oneYearReturns = funds.map(f => f.oneYearPercent).filter(v => v !== null && v !== undefined);
     const expenseRatios = funds.map(f => f.expenseRatio).filter(v => v !== null && v !== undefined);
@@ -391,6 +433,6 @@ class FundDataProcessor {
 }
 
 export const fundDataProcessor = new FundDataProcessor();
-export const getAllFunds = async () => await fundDataProcessor.parseInstrumentsData();
-export const getFilterOptions = async () => await fundDataProcessor.getFilterOptions();
-export const getRangeValues = async () => await fundDataProcessor.getRangeValues();
+export const getAllFunds = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.parseInstrumentsData(onProgress);
+export const getFilterOptions = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getFilterOptions(onProgress);
+export const getRangeValues = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getRangeValues(onProgress);
