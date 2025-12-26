@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
-import { getAllFunds, getFilterOptions, getRangeValues } from '@/lib/fundData';
+import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
 import FundList from './FundList';
 import FundCard from './FundCard';
@@ -18,6 +18,7 @@ export default function FundExplorer() {
   const [loading, setLoading] = useState(true);
   const [loadingPhase, setLoadingPhase] = useState('');
   const [loadingPercent, setLoadingPercent] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load data
   useEffect(() => {
@@ -315,6 +316,42 @@ export default function FundExplorer() {
     }
   };
 
+  // Refresh data from remote
+  const refreshData = async () => {
+    setRefreshing(true);
+    try {
+      // Clear caches to force fresh data
+      fundDataProcessor.clearCache();
+
+      // Reload data
+      const funds = await getAllFunds((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const options = await getFilterOptions((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const ranges = await getRangeValues((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+
+      setAllFunds(funds);
+      setFilterOptions(options);
+      setRangeValues(ranges);
+      setFilteredFunds(funds);
+      setLoading(false);
+
+      alert('Data refreshed successfully!');
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+      alert('Failed to refresh data. Please check your internet connection.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Get active filter count and descriptions
   const getActiveFiltersInfo = () => {
     const activeFilters: string[] = [];
@@ -393,9 +430,28 @@ export default function FundExplorer() {
               <h1 className="text-3xl font-bold text-gray-900">FundWallet</h1>
               <p className="text-gray-600 mt-1">Comprehensive Mutual Fund Explorer</p>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Total Funds</div>
-              <div className="text-2xl font-bold text-blue-600">{allFunds.length}</div>
+            <div className="text-right flex items-center gap-4">
+              <div>
+                <div className="text-sm text-gray-500">Total Funds</div>
+                <div className="text-2xl font-bold text-blue-600">{allFunds.length}</div>
+              </div>
+              <button
+                onClick={refreshData}
+                disabled={refreshing}
+                className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                title="Refresh data from remote server"
+              >
+                {refreshing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Refreshing...
+                  </>
+                ) : (
+                  <>
+                    🔄 Refresh
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
