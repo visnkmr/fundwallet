@@ -249,35 +249,49 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                     onChange={(e) => setAmcSearch(e.target.value)}
                     className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
-                  <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
-                    <input
-                      type="checkbox"
-                      checked={selectAllAmc}
-                      onChange={(e) => {
-                        setSelectAllAmc(e.target.checked);
-                        if (e.target.checked) {
-                          onFiltersChange({ ...filters, amc: undefined });
-                        } else {
-                          onFiltersChange({ ...filters, amc: filterOptions.amc });
-                        }
-                      }}
-                      className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Select All AMCs</span>
-                  </label>
-                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                    {filterOptions.amc?.sort().filter((amc: string) => amc.toLowerCase().includes(amcSearch.toLowerCase())).map((amc: string) => (
-                     <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
-                       <input
-                         type="checkbox"
-                         checked={selectAllAmc || (filters.amc?.includes(amc) || false)}
-                         onChange={() => { if (!selectAllAmc) { handleCheckboxChange('amc', amc); } }}
-                         disabled={selectAllAmc}
-                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                       />
-                       <span className="text-sm text-gray-700">{amc}</span>
-                     </label>
-                   ))}
+                   <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
+                     <input
+                       type="checkbox"
+                       checked={selectAllAmc}
+                       onChange={(e) => {
+                         setSelectAllAmc(e.target.checked);
+                         if (e.target.checked) {
+                           onFiltersChange({ ...filters, amc: undefined });
+                         } else {
+                           onFiltersChange({ ...filters, amc: [] });
+                         }
+                       }}
+                       className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                     />
+                     <span className="text-sm font-medium text-gray-700">Select All AMCs</span>
+                   </label>
+                   <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                     {filterOptions.amc?.sort().filter((amc: string) => amc.toLowerCase().includes(amcSearch.toLowerCase())).map((amc: string) => (
+                      <label key={amc} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectAllAmc || (filters.amc?.includes(amc) || false)}
+                          onChange={() => {
+                            const current = filters.amc || [];
+                            let newAmc;
+                            if (current.includes(amc)) {
+                              newAmc = current.filter(v => v !== amc);
+                            } else {
+                              newAmc = [...current, amc];
+                            }
+                            if (newAmc.length === filterOptions.amc?.length) {
+                              setSelectAllAmc(true);
+                              newAmc = undefined;
+                            } else {
+                              setSelectAllAmc(false);
+                            }
+                            onFiltersChange({ ...filters, amc: newAmc });
+                          }}
+                          className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{amc}</span>
+                      </label>
+                    ))}
                 </div>
               </div>
 
@@ -367,35 +381,49 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                     onChange={(e) => setManagerSearch(e.target.value)}
                     className="w-full mb-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   />
-                  <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
-                    <input
-                      type="checkbox"
-                      checked={selectAllManager}
-                      onChange={(e) => {
-                        setSelectAllManager(e.target.checked);
-                        if (e.target.checked) {
-                          onFiltersChange({ ...filters, manager: undefined });
-                        } else {
-                          onFiltersChange({ ...filters, manager: filterOptions.manager });
-                        }
-                      }}
-                      className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Select All Fund Managers</span>
-                  </label>
-                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
-                    {filterOptions.manager?.sort().filter((manager: string) => manager.toLowerCase().includes(managerSearch.toLowerCase())).map((manager: string) => (
-                     <label key={manager} className="flex items-center hover:bg-gray-50 p-1 rounded">
-                       <input
-                         type="checkbox"
-                         checked={selectAllManager || (filters.manager?.includes(manager) || false)}
-                         onChange={() => { if (!selectAllManager) { handleCheckboxChange('manager', manager); } }}
-                         disabled={selectAllManager}
-                         className="mr-2 rounded text-blue-500 focus:ring-blue-500"
-                       />
-                       <span className="text-sm text-gray-700">{manager}</span>
-                     </label>
-                   ))}
+                   <label className="flex items-center hover:bg-gray-50 p-1 rounded mb-2">
+                     <input
+                       type="checkbox"
+                       checked={selectAllManager}
+                       onChange={(e) => {
+                         setSelectAllManager(e.target.checked);
+                         if (e.target.checked) {
+                           onFiltersChange({ ...filters, manager: undefined });
+                         } else {
+                           onFiltersChange({ ...filters, manager: [] });
+                         }
+                       }}
+                       className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                     />
+                     <span className="text-sm font-medium text-gray-700">Select All Fund Managers</span>
+                   </label>
+                   <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                     {filterOptions.manager?.sort().filter((manager: string) => manager.toLowerCase().includes(managerSearch.toLowerCase())).map((manager: string) => (
+                      <label key={manager} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectAllManager || (filters.manager?.includes(manager) || false)}
+                          onChange={() => {
+                            const current = filters.manager || [];
+                            let newManager;
+                            if (current.includes(manager)) {
+                              newManager = current.filter(v => v !== manager);
+                            } else {
+                              newManager = [...current, manager];
+                            }
+                            if (newManager.length === filterOptions.manager?.length) {
+                              setSelectAllManager(true);
+                              newManager = undefined;
+                            } else {
+                              setSelectAllManager(false);
+                            }
+                            onFiltersChange({ ...filters, manager: newManager });
+                          }}
+                          className="mr-2 rounded text-blue-500 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">{manager}</span>
+                      </label>
+                    ))}
                  </div>
                </div>
 
