@@ -11,7 +11,10 @@
     "convert": "node convert.js"
   },
   "dependencies": {
+    "apache-arrow": "^21.1.0",
     "next": "^14.0.0",
+    "parquet-wasm": "^0.7.1",
+    "parquetjs": "^0.11.2",
     "react": "^18.0.0",
     "react-dom": "^18.0.0",
     "xlsx": "^0.18.5"
@@ -20,11 +23,11 @@
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "typescript": "^5.0.0",
+    "autoprefixer": "^10.0.0",
     "eslint": "^8.0.0",
     "eslint-config-next": "^14.0.0",
+    "postcss": "^8.0.0",
     "tailwindcss": "^3.0.0",
-    "autoprefixer": "^10.0.0",
-    "postcss": "^8.0.0"
+    "typescript": "^5.0.0"
   }
 }

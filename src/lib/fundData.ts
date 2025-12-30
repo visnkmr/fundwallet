@@ -1,19 +1,21 @@
 import { FundData, FilterOptions, RangeValues } from '@/types/fund';
+import * as parquet_wasm from 'parquet-wasm';
+import { Table } from 'apache-arrow';
 
-// Helper function from the original export_amc_data.js
+// Helper from original
 const l = {
   qz: (str: string) => String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-')
 };
 
-// IndexedDB utilities for offline caching
+// IndexedDB caching (unchanged)
 const DB_NAME = 'FundWalletCache';
 const DB_VERSION = 1;
 const DATA_STORE = 'fundData';
-const CACHE_KEY = 'mainData';
+const CACHE_KEY = 'mainDataParquet'; // Updated key to avoid conflict
 
 interface CachedData {
   key: string;
-  data: any;
+  data: FundData[];
   timestamp: number;
   version: string;
 }
@@ -33,183 +35,133 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-async function getCachedData(): Promise<{u: any, s: any} | null> {
-  const entry = await getCachedDataEntry();
-  return entry ? entry.data : null;
+import { tableFromIPC } from 'apache-arrow';
+// import * as parquet_wasm from 'parquet-wasm';
+
+async function loadParquetFromUrl(
+  url: string,
+  onProgress?: (phase: string, percent: number) => void
+): Promise<FundData[]> {
+  onProgress?.('Downloading Parquet file...', 0);
+
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch: ${response.status}`);
+
+  const contentLength = Number(response.headers.get('content-length') || '0');
+  const reader = response.body!.getReader();
+  let received = 0;
+  const chunks: Uint8Array[] = [];
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (contentLength > 0) {
+      onProgress?.('Downloading...', Math.round((received / contentLength) * 90));
+    }
+  }
+
+  const buffer = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    buffer.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  onProgress?.('Initializing WASM & parsing...', 95);
+
+  // Initialize WASM if not already done (idempotent in most cases)
+  await parquet_wasm.default();
+
+  // Now use the function
+  const wasmTable = parquet_wasm.readParquet(buffer);
+  const ipcStream = wasmTable.intoIPCStream();
+  const arrowTable = tableFromIPC(ipcStream);
+
+  const records: FundData[] = Array.from(arrowTable);
+
+  onProgress?.('Data loaded', 100);
+  return records;
 }
+
+let dataCache: FundData[] | null = null;
 
 async function getCachedDataEntry(): Promise<CachedData | null> {
   try {
     const db = await openDB();
-    const transaction = db.transaction([DATA_STORE], 'readonly');
-    const store = transaction.objectStore(DATA_STORE);
+    const tx = db.transaction([DATA_STORE], 'readonly');
+    const store = tx.objectStore(DATA_STORE);
     const request = store.get(CACHE_KEY);
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       request.onsuccess = () => {
-        const result: CachedData | undefined = request.result;
-        if (result && result.data) {
-          console.log('Loaded data from IndexedDB cache');
+        const result = request.result as CachedData | undefined;
+        if (result && result.version === '2.0') {
+          console.log('Loaded fund data from IndexedDB cache');
           resolve(result);
         } else {
           resolve(null);
         }
       };
-      request.onerror = () => reject(request.error);
+      request.onerror = () => resolve(null);
     });
-  } catch (error) {
-    console.warn('Failed to load from cache:', error);
+  } catch (err) {
+    console.warn('Cache read error:', err);
     return null;
   }
 }
 
-async function setCachedData(data: {u: any, s: any}): Promise<void> {
+async function setCachedData(data: FundData[]): Promise<void> {
   try {
     const db = await openDB();
-    const transaction = db.transaction([DATA_STORE], 'readwrite');
-    const store = transaction.objectStore(DATA_STORE);
+    const tx = db.transaction([DATA_STORE], 'readwrite');
+    const store = tx.objectStore(DATA_STORE);
 
-    const cachedData: CachedData = {
-      key: CACHE_KEY,
-      data,
-      timestamp: Date.now(),
-      version: '1.0' // Increment this when data format changes
-    };
-
-    return new Promise((resolve, reject) => {
-      const request = store.put(cachedData);
-      request.onsuccess = () => {
-        console.log('Data cached to IndexedDB');
-        resolve();
-      };
+    await new Promise<void>((resolve, reject) => {
+      const request = store.put({
+        key: CACHE_KEY,
+        data,
+        timestamp: Date.now(),
+        version: '2.0'
+      });
+      request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
-  } catch (error) {
-    console.warn('Failed to cache data:', error);
+
+    console.log('Parquet-derived data cached to IndexedDB');
+  } catch (err) {
+    console.warn('Failed to cache data:', err);
   }
 }
 
-// Data loading from URL
-const key = new TextEncoder().encode('0123456789abcdef0123456789abcdef');
-
-async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
-  onProgress?.('Downloading data...', 0);
-  const response = await fetch(url);
-  const contentLength = parseInt(response.headers.get('content-length') || '0');
-  const reader = response.body?.getReader();
-  let received = 0;
-  const chunks: Uint8Array[] = [];
-  if (reader) {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (contentLength > 0) {
-        onProgress?.('Downloading data...', Math.round((received / contentLength) * 100));
-      }
-    }
-  }
-  // Concatenate chunks
-  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
-  const concatenated = new Uint8Array(totalLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    concatenated.set(chunk, offset);
-    offset += chunk.length;
-  }
-  const base64 = new TextDecoder().decode(concatenated);
-  onProgress?.('Decrypting data...', 0);
-  const encryptedWithTag = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-  const iv = encryptedWithTag.slice(0, 16);
-  const encrypted = encryptedWithTag.slice(16, -16);
-  const authTag = encryptedWithTag.slice(-16);
-  const keyBuffer = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
-  const algorithm = { name: 'AES-GCM', iv: iv, tagLength: 128 };
-  const decrypted = await crypto.subtle.decrypt(algorithm, keyBuffer, new Uint8Array([...encrypted, ...authTag]));
-  onProgress?.('Decompressing data...', 0);
-  const decompressedResponse = new Response(decrypted);
-  const decompressed = await decompressedResponse.arrayBuffer();
-  const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue(new Uint8Array(decompressed));
-      controller.close();
-    }
-  }).pipeThrough(new DecompressionStream('gzip'));
-  const decompressedBlob = await new Response(stream).blob();
-  onProgress?.('Parsing JSON...', 0);
-  const jsonString = await decompressedBlob.text();
-  const combined = JSON.parse(jsonString);
-  onProgress?.('Data loaded', 100);
-  return { u: combined.u, s: combined.s };
-}
-
-let dataCache: {u: any, s: any} | null = null;
-
-async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
-  if (dataCache) return dataCache;
-
-  // Try to load from IndexedDB cache first
-  const cachedEntry = await getCachedDataEntry();
-  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  const now = Date.now();
-
-  if (cachedEntry && cachedEntry.data) {
-    dataCache = cachedEntry.data;
-    onProgress?.('Data loaded from cache', 100);
-
-    // Check if cache is stale (older than 24 hours)
-    const isStale = (now - cachedEntry.timestamp) > CACHE_DURATION;
-
-    if (isStale) {
-      console.log('Cache is stale, fetching fresh data in background...');
-      // Fetch fresh data in background without blocking
-      fetchFreshData().catch(error => {
-        console.warn('Failed to fetch fresh data in background:', error);
-      });
-    }
-
-    // dataCache is guaranteed to be set here
-    return dataCache!;
+async function getData(onProgress?: (phase: string, percent: number) => void): Promise<FundData[]> {
+  if (dataCache) {
+    onProgress?.('Using in-memory cache', 100);
+    return dataCache;
   }
 
-  // If not in cache, fetch from URL
-  onProgress?.('Fetching data from network...', 0);
-  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
-  dataCache = await loadDataFromUrl(url, onProgress);
+  const cached = await getCachedDataEntry();
+  if (cached) {
+    dataCache = cached.data;
+    return dataCache;
+  }
 
-  // Cache the data for future use
+  onProgress?.('Fetching from network...', 0);
+  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.parquet';
+  
+  dataCache = await loadParquetFromUrl(url, onProgress);
   await setCachedData(dataCache);
 
   return dataCache;
 }
 
-// Background fetch function
-async function fetchFreshData(): Promise<void> {
-  try {
-    const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
-    const freshData: {u: any, s: any} = await loadDataFromUrl(url);
-
-    // Update cache with fresh data
-    await setCachedData(freshData);
-
-    // Update in-memory cache if it exists
-    if (dataCache) {
-      dataCache = freshData;
-    }
-
-    console.log('Fresh data fetched and cached successfully');
-  } catch (error) {
-    console.warn('Failed to fetch fresh data:', error);
-  }
-}
-
 class FundDataProcessor {
   private cachedFunds: FundData[] | null = null;
   private cachedFilterOptions: FilterOptions | null = null;
-  private cachedRangeValues: any | null = null;
+  private cachedRangeValues: RangeValues | null = null;
 
-  private amcToIconIndex = {
+  private amcToIconIndex: Record<string, number> = {
     AXISMUTUALFUND_MF: 0,
     BARODAMUTUALFUND_MF: 1,
     BHARTIAXAMUTUALFUND_MF: 2,
@@ -254,7 +206,7 @@ class FundDataProcessor {
     ZERODHAMUTUALFUND_MF: 41
   };
 
-  private schemeToIconIndex = {
+  private schemeToIconIndex: Record<string, number> = {
     equity: 1,
     "index funds": 7,
     "fund of funds": 3,
@@ -264,309 +216,140 @@ class FundDataProcessor {
     "-": 2
   };
 
-  private dividendTypeToIdcw = {
-    "dividend annual payout": "IDCW Annual",
-    "dividend semi annual payout": "IDCW Semi Annual",
-    "dividend quarterly payout": "IDCW Quarterly",
-    "dividend monthly payout": "IDCW Monthly",
-    "dividend fortnightly payout": "IDCW Fortnightly",
-    "dividend weekly payout": "IDCW Weekly",
-    "dividend interim payout": "IDCW Interim",
-    "dividend daily payout": "IDCW Daily",
-    "dividend payout": "IDCW Payout",
-    growth: "Growth",
-    "dividend reinvest": "Dividend reinvest"
-  };
-
-  async getInstrumentsDaily(onProgress?: (phase: string, percent: number) => void) {
-    const data = await getData(onProgress);
-    let e = data.u.n9 || [];
-    return e;
+  stripPlanName(name: string): string {
+    return name.replace("  ", " ").replace(" - Direct Plan", "").replace(" - Regular Plan", "");
   }
 
-  async getInstrumentsMeta(onProgress?: (phase: string, percent: number) => void) {
-    const data = await getData(onProgress);
-    let e = data.s.n9 || [];
-    return e;
+  getFileName(fund: FundData): string {
+    const schemeKey = fund.scheme.toLowerCase();
+    const amcKey = fund.amc || "-";
+
+    const amcIndex = this.amcToIconIndex[amcKey] ?? this.amcToIconIndex["-"];
+    const schemeIndex = this.schemeToIconIndex[schemeKey] ?? this.schemeToIconIndex["-"];
+
+    const iconId = 7 * amcIndex + schemeIndex;
+    return `mf-amc-${iconId}.svg`;
   }
 
-  async getFactsheetData(onProgress?: (phase: string, percent: number) => void) {
-    const data = await getData(onProgress);
-    // @ts-ignore
-    return data.u.FC || [];
-  }
-
-  stripPlanName(e: string) {
-    return e.replace("  ", " ").replace(" - Direct Plan", "").replace(" - Regular Plan", "");
-  }
-
-  formatDividendTypeWithInterval(e: string, t: string) {
-    if ("G" === e) return "Growth";
-    if ("P" === e) return "Dividend " + (null === t ? "" : t.toLowerCase() + " ") + "payout";
-    if ("R" === e) return "dividend reinvest";
-    {
-      let result = null === e ? "" : e.toLowerCase() + " ";
-      return result;
-    }
-  }
-
-  getFileName(e: any) {
-    let t = e.scheme.toLowerCase();
-    let a = e.amc;
-    let n = this.amcToIconIndex["-"];
-    if (a in this.amcToIconIndex) {
-      n = this.amcToIconIndex[a as keyof typeof this.amcToIconIndex];
-    }
-    let i = this.schemeToIconIndex["-"];
-    if (t in this.schemeToIconIndex) {
-      i = this.schemeToIconIndex[t as keyof typeof this.schemeToIconIndex];
-    }
-    let o = 7 * n + i;
-    return `mf-amc-${o}.svg`;
-  }
-
-  getUniqueValues(e: any[]) {
-    return Array.from(new Set(e));
+  getUniqueValues<T>(arr: T[]): T[] {
+    return Array.from(new Set(arr));
   }
 
   async parseInstrumentsData(onProgress?: (phase: string, percent: number) => void): Promise<FundData[]> {
-    // Return cached data if available
-    if (this.cachedFunds !== null) {
-      console.log('Using cached fund data');
-      onProgress?.('Using cached data', 100);
+    if (this.cachedFunds) {
+      onProgress?.('Using cached processed funds', 100);
       return this.cachedFunds;
     }
 
-    console.log('Parsing fund data from JSON...');
-    onProgress?.('Fetching instruments data...', 0);
+    onProgress?.('Loading fund data...', 0);
+    const rawFunds = await getData(onProgress);
 
-    let e = await this.getInstrumentsDaily((phase, percent) => onProgress?.(phase, percent));
-    onProgress?.('Fetching meta data...', 10);
-    let t = await this.getInstrumentsMeta();
-    onProgress?.('Fetching factsheet data...', 20);
-    let fc = await this.getFactsheetData();
-    let fcMap = new Map(fc.map((item: any) => [item[0], { link: item[1], name: item[2] }]));
-    let n: FundData[] = [];
-    let i: string[] = [];
-    let d = new Map(t.map((item: any) => [item[0], true]));
+    onProgress?.('Enhancing fund objects...', 50);
 
-    onProgress?.('Processing fund data...', 30);
-    const total = e.length;
-    e.forEach((e: any[], index: number) => {
-      let a = {} as FundData;
-      let r = e[0];
-      if (d.has(r)) {
-        let d = t.findIndex((item: any) => item[0] === r);
-        let u = t[d];
+    const enhancedFunds: FundData[] = rawFunds.map((f: any) => ({
+      ...f,
+      fundLowerCase: f.fund.toLowerCase(),
+      plan: f.plan === 0 || f.plan === "Regular" ? "Regular" : "Direct",
+      fileNamePath: this.getFileName(f),
+      fundPrimaryDetail: [
+        f.tradingSymbol.toLowerCase(),
+        this.stripPlanName(f.fund).toLowerCase(),
+        f.scheme.toLowerCase(),
+        f.subScheme.toLowerCase(),
+        (f.dividendInterval || "").toLowerCase()
+      ].join(" "),
+      fundSlug: l.qz(`${this.stripPlanName(f.fund)} ${f.plan} ${f.dividendInterval || ''}`)
+    }));
 
-        a.tradingSymbol = e[0] as string;
-        a.purchaseAllowed = 1 === e[1];
-        a.redemptionAllowed = 1 === e[2];
-        a.lastDividendDate = (e[3] as string) || "";
-        a.lastDividendPercent = (e[4] as number) || 0;
-        a.lastPrice = e[5] as number;
-        a.lastPriceDate = e[6] as string;
-        a.changePercent = e[7] as number;
-        a.oneYearPercent = e[8] as number;
-        a.twoYearPercent = e[9] as number;
-        a.threeYearPercent = e[10] as number;
-        a.fourYearPercent = e[11] as number;
-        a.fiveYearPercent = e[12] as number;
-        a.aum = 10000000 * (e[13] as number);
-        a.amc = u[1] as string;
-
-        const amcData = fcMap.get(a.amc) as {link: string, name: string} | undefined;
-        if (amcData) {
-          a.realAmcName = amcData.name;
-          a.factsheetLink = amcData.link;
-        }
-        a.fund = this.stripPlanName(u[2] as string);
-        a.fundLowerCase = this.stripPlanName(u[2] as string).toLowerCase();
-        a.minPurchaseAmt = u[3] as number;
-        a.purchaseAmtMulti = u[4] as number;
-        a.minAdditionalPurchaseAmt = u[5] as number;
-        a.minRedemptionQty = u[6] as number;
-        a.redemptionQtyMulti = u[7] as number;
-        a.dividendType = u[8] as string;
-        a.dividendInterval = (u[9] as string) || this.formatDividendTypeWithInterval(u[8] as string, u[9] as string);
-        a.scheme = u[10] as string;
-        a.subScheme = u[11] as string;
-        a.plan = 0 == u[12] ? "Regular" : "Direct";
-        a.settlementType = u[13] as string;
-        a.launchDate = u[14] as string;
-        a.exitLoad = u[15] as string;
-        a.exitLoadSlab = u[16] as number;
-        a.expenseRatio = u[17] as number;
-        a.amcSipFlag = 1 === u[18];
-        a.manager = u[19] as string;
-        a.lockIn = u[20] as number;
-        a.risk = u[21] as number;
-        a.fileNamePath = this.getFileName(a);
-        a.fundPrimaryDetail = (u[0] as string).toLowerCase() + " " + this.stripPlanName(u[2] as string).toLowerCase() + " " + (u[10] as string).toLowerCase() + " " + (u[11] as string).toLowerCase() + " " + a.dividendInterval.toLowerCase();
-        a.fundSlug = l.qz(`${a.fund} ${a.plan} ${a.dividendInterval}`);
-
-        i.push(a.dividendInterval);
-        n.push(a);
-      }
-      if (index % 100 === 0) {
-        onProgress?.('Processing fund data...', 30 + Math.round((index / total) * 70));
-      }
-    });
-
-    onProgress?.('Data processed', 100);
-    // Cache the parsed data
-    this.cachedFunds = n;
-    return n;
+    this.cachedFunds = enhancedFunds;
+    onProgress?.('Processing complete', 100);
+    return enhancedFunds;
   }
 
   async getFilterOptions(onProgress?: (phase: string, percent: number) => void): Promise<FilterOptions> {
-    // Return cached filter options if available
-    if (this.cachedFilterOptions !== null) {
-      console.log('Using cached filter options');
-      onProgress?.('Filter options ready', 100);
+    if (this.cachedFilterOptions) {
+      onProgress?.('Filter options from cache', 100);
       return this.cachedFilterOptions;
     }
 
-    console.log('Generating filter options...');
-    onProgress?.('Generating filter options...', 0);
-
     const funds = await this.parseInstrumentsData(onProgress);
 
-    const amcList = this.getUniqueValues(funds.map(f => f.realAmcName || f.amc));
-    const schemeList = this.getUniqueValues(funds.map(f => f.scheme));
-    const planList = this.getUniqueValues(funds.map(f => f.plan));
-    const dividendIntervalList = this.getUniqueValues(funds.map(f => f.dividendInterval));
-    const riskList = this.getUniqueValues(funds.map(f => f.risk));
-    const minPurchaseAmtList = this.getUniqueValues(funds.map(f => f.minPurchaseAmt));
-    const expenseRatioList = this.getUniqueValues(funds.map(f => f.expenseRatio));
-    const launchYearList = Array.from(new Set(funds.map(f => {
-      const date = new Date(f.launchDate);
-      return date.getFullYear();
-    }).filter(year => !isNaN(year))));
-    const managerList = this.getUniqueValues(funds.map(f => f.manager).filter(m => m && m.trim() !== ''));
-    const settlementTypeList = this.getUniqueValues(funds.map(f => f.settlementType).filter(s => s && s.trim() !== ''));
-    const purchaseAllowedList = this.getUniqueValues(funds.map(f => f.purchaseAllowed));
-    const redemptionAllowedList = this.getUniqueValues(funds.map(f => f.redemptionAllowed));
-    const amcSipFlagList = this.getUniqueValues(funds.map(f => f.amcSipFlag));
-    const subSchemeList = this.getUniqueValues(funds.map(f => f.subScheme).filter(s => s && s.trim() !== ''));
-    const lockInList = this.getUniqueValues(funds.map(f => f.lockIn).filter(l => l > 0));
-
     const filterOptions: FilterOptions = {
-      amc: amcList,
-      scheme: schemeList,
-      plan: planList,
-      dividendInterval: dividendIntervalList,
-      risk: riskList,
-      minPurchaseAmt: minPurchaseAmtList,
-      expenseRatio: expenseRatioList,
-      launchYear: launchYearList,
-      manager: managerList,
-      settlementType: settlementTypeList,
-      purchaseAllowed: purchaseAllowedList,
-      redemptionAllowed: redemptionAllowedList,
-      amcSipFlag: amcSipFlagList,
-      subScheme: subSchemeList,
-      lockIn: lockInList
+      amc: this.getUniqueValues(funds.map(f => f.realAmcName || f.amc)),
+      scheme: this.getUniqueValues(funds.map(f => f.scheme)),
+      plan: this.getUniqueValues(funds.map(f => f.plan)),
+      dividendInterval: this.getUniqueValues(funds.map(f => f.dividendInterval || '')),
+      risk: this.getUniqueValues(funds.map(f => f.risk)),
+      minPurchaseAmt: this.getUniqueValues(funds.map(f => f.minPurchaseAmt)),
+      expenseRatio: this.getUniqueValues(funds.map(f => f.expenseRatio)),
+      launchYear: this.getUniqueValues(
+        funds
+          .map(f => new Date(f.launchDate).getFullYear())
+          .filter(y => !isNaN(y))
+      ),
+      manager: this.getUniqueValues(funds.map(f => f.manager).filter(m => m?.trim())),
+      settlementType: this.getUniqueValues(funds.map(f => f.settlementType).filter(s => s?.trim())),
+      purchaseAllowed: this.getUniqueValues(funds.map(f => f.purchaseAllowed)),
+      redemptionAllowed: this.getUniqueValues(funds.map(f => f.redemptionAllowed)),
+      amcSipFlag: this.getUniqueValues(funds.map(f => f.amcSipFlag)),
+      subScheme: this.getUniqueValues(funds.map(f => f.subScheme).filter(s => s?.trim())),
+      lockIn: this.getUniqueValues(funds.map(f => f.lockIn).filter(l => l > 0))
     };
 
-    // Cache the filter options
     this.cachedFilterOptions = filterOptions;
     return filterOptions;
   }
 
   async getRangeValues(onProgress?: (phase: string, percent: number) => void): Promise<RangeValues> {
-    // Return cached range values if available
-    if (this.cachedRangeValues !== null) {
-      console.log('Using cached range values');
-      onProgress?.('Range values ready', 100);
+    if (this.cachedRangeValues) {
+      onProgress?.('Range values from cache', 100);
       return this.cachedRangeValues;
     }
 
-    console.log('Calculating range values...');
-    onProgress?.('Calculating range values...', 0);
-
     const funds = await this.parseInstrumentsData(onProgress);
 
-    const oneYearReturns = funds.map(f => f.oneYearPercent).filter(v => v !== null && v !== undefined);
-    const expenseRatios = funds.map(f => f.expenseRatio).filter(v => v !== null && v !== undefined);
-    const aums = funds.map(f => f.aum).filter(v => v !== null && v !== undefined);
-    const minInvestments = funds.map(f => f.minPurchaseAmt).filter(v => v !== null && v !== undefined);
-    const navs = funds.map(f => f.lastPrice).filter(v => v !== null && v !== undefined);
+    const oneYearReturns = funds.map(f => f.oneYearPercent).filter(v => v != null);
+    const expenseRatios = funds.map(f => f.expenseRatio).filter(v => v != null);
+    const aums = funds.map(f => f.aum).filter(v => v != null);
+    const minInvestments = funds.map(f => f.minPurchaseAmt).filter(v => v != null);
+    const navs = funds.map(f => f.lastPrice).filter(v => v != null);
 
-    // Extract exit load percentages from exit load strings
     const exitLoads = funds.map(f => {
-      // If exit load is absent/null/undefined/empty, treat as 0
-      if (!f.exitLoad || f.exitLoad === "" || f.exitLoad === "0" || f.exitLoad === "Nil" || f.exitLoad === "nil") return 0;
+      if (!f.exitLoad || /^0|nil$/i.test(f.exitLoad)) return 0;
+      const match = f.exitLoad.match(/(\d+(?:\.\d+)?)%/);
+      return match ? parseFloat(match[1]) : 0;
+    });
 
-      // Handle various exit load formats like "1%", "1.5%", "0.5% for 1 year", etc.
-      const match = f.exitLoad.match(/(\d+\.?\d*)%/);
-      if (match) {
-        return parseFloat(match[1]);
-      } else {
-        // Try to extract any number that might be a percentage
-        const numMatch = f.exitLoad.match(/(\d+\.?\d*)/);
-        if (numMatch) {
-          const num = parseFloat(numMatch[1]);
-          // If the number is between 0 and 100, assume it's a percentage
-          if (num >= 0 && num <= 100) {
-            return num;
-          }
-        }
-      }
-      return 0;
-    }).filter(v => v !== null && v !== undefined);
-
-    // Extract launch years
-    const launchYears = funds.map(f => {
-      const date = new Date(f.launchDate);
-      return date.getFullYear();
-    }).filter(year => !isNaN(year));
+    const launchYears = funds
+      .map(f => new Date(f.launchDate).getFullYear())
+      .filter(y => !isNaN(y));
 
     const rangeValues: RangeValues = {
-      oneYearReturn: {
-        min: Math.min(...oneYearReturns),
-        max: Math.max(...oneYearReturns)
-      },
-      expenseRatio: {
-        min: Math.min(...expenseRatios),
-        max: Math.max(...expenseRatios)
-      },
-      exitLoad: {
-        min: Math.min(...exitLoads),
-        max: Math.max(...exitLoads)
-      },
-      aum: {
-        min: Math.min(...aums),
-        max: Math.max(...aums)
-      },
-      minInvestment: {
-        min: Math.min(...minInvestments),
-        max: Math.max(...minInvestments)
-      },
-      nav: {
-        min: Math.min(...navs),
-        max: Math.max(...navs)
-      },
-      launchYear: {
-        min: Math.min(...launchYears),
-        max: Math.max(...launchYears)
-      }
+      oneYearReturn: { min: Math.min(...oneYearReturns), max: Math.max(...oneYearReturns) },
+      expenseRatio: { min: Math.min(...expenseRatios), max: Math.max(...expenseRatios) },
+      exitLoad: { min: Math.min(...exitLoads), max: Math.max(...exitLoads) },
+      aum: { min: Math.min(...aums), max: Math.max(...aums) },
+      minInvestment: { min: Math.min(...minInvestments), max: Math.max(...minInvestments) },
+      nav: { min: Math.min(...navs), max: Math.max(...navs) },
+      launchYear: { min: Math.min(...launchYears), max: Math.max(...launchYears) }
     };
 
-    // Cache the range values
     this.cachedRangeValues = rangeValues;
     return rangeValues;
   }
 
-  // Method to clear cache (useful for development/testing)
   clearCache(): void {
     this.cachedFunds = null;
     this.cachedFilterOptions = null;
     this.cachedRangeValues = null;
+    dataCache = null;
   }
 }
 
 export const fundDataProcessor = new FundDataProcessor();
-export const getAllFunds = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.parseInstrumentsData(onProgress);
-export const getFilterOptions = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getFilterOptions(onProgress);
-export const getRangeValues = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getRangeValues(onProgress);
+export const getAllFunds = (onProgress?: (phase: string, percent: number) => void) =>
+  fundDataProcessor.parseInstrumentsData(onProgress);
+export const getFilterOptions = (onProgress?: (phase: string, percent: number) => void) =>
+  fundDataProcessor.getFilterOptions(onProgress);
+export const getRangeValues = (onProgress?: (phase: string, percent: number) => void) =>
+  fundDataProcessor.getRangeValues(onProgress);
