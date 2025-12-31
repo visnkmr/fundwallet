@@ -92,8 +92,8 @@ async function setCachedData(data: {u: any, s: any}): Promise<void> {
 // Data loading from URL
 const key = new TextEncoder().encode('0123456789abcdef0123456789abcdef');
 
-async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
-  onProgress?.('Downloading data...', 0);
+async function downloadChunk(url: string, onProgress?: (phase: string, percent: number) => void): Promise<Uint8Array> {
+  onProgress?.('Downloading chunk...', 0);
   const response = await fetch(url);
   const contentLength = parseInt(response.headers.get('content-length') || '0');
   const reader = response.body?.getReader();
@@ -106,7 +106,7 @@ async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent
       chunks.push(value);
       received += value.length;
       if (contentLength > 0) {
-        onProgress?.('Downloading data...', Math.round((received / contentLength) * 100));
+        onProgress?.('Downloading chunk...', Math.round((received / contentLength) * 100));
       }
     }
   }
@@ -118,8 +118,10 @@ async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent
     concatenated.set(chunk, offset);
     offset += chunk.length;
   }
-  const base64 = new TextDecoder().decode(concatenated);
-  onProgress?.('Decrypting data...', 0);
+  return concatenated;
+}
+
+async function decryptChunk(base64: string): Promise<Uint8Array> {
   const encryptedWithTag = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
   const iv = encryptedWithTag.slice(0, 16);
   const encrypted = encryptedWithTag.slice(16, -16);
@@ -127,27 +129,140 @@ async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent
   const keyBuffer = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['decrypt']);
   const algorithm = { name: 'AES-GCM', iv: iv, tagLength: 128 };
   const decrypted = await crypto.subtle.decrypt(algorithm, keyBuffer, new Uint8Array([...encrypted, ...authTag]));
-  onProgress?.('Decompressing data...', 0);
-  const decompressedResponse = new Response(decrypted);
-  const decompressed = await decompressedResponse.arrayBuffer();
-  const stream = new ReadableStream({
-    start(controller) {
-      controller.enqueue(new Uint8Array(decompressed));
-      controller.close();
+  return new Uint8Array(decrypted);
+}
+
+// Global variables for background loading
+let backgroundLoadPromise: Promise<{u: any, s: any}> | null = null;
+let isBackgroundLoadingComplete = false;
+let completeDataCache: {u: any, s: any} | null = null;
+
+// Event listeners for background loading completion
+const backgroundLoadListeners: Array<(data: {u: any, s: any}) => void> = [];
+
+function addBackgroundLoadListener(callback: (data: {u: any, s: any}) => void) {
+  backgroundLoadListeners.push(callback);
+}
+
+function notifyBackgroundLoadComplete(data: {u: any, s: any}) {
+  backgroundLoadListeners.forEach(callback => callback(data));
+  isBackgroundLoadingComplete = true;
+  completeDataCache = data;
+}
+
+async function loadPriorityChunkOnly(baseUrl: string, onProgress?: (phase: string, percent: number) => void): Promise<{u: Partial<any>, s: Partial<any>}> {
+  // Load just the first chunk for quick UI initialization
+  onProgress?.('Loading priority chunk...', 10);
+  const url = `${baseUrl.replace('.b64', '_part1.b64')}`;
+  
+  const chunkData = await downloadChunk(url);
+  onProgress?.('Decrypting priority chunk...', 40);
+  const decryptedChunk = await decryptChunk(new TextDecoder().decode(chunkData));
+  
+  // Since we only have the first chunk, we can't decompress the full gzip stream yet
+  // Instead, we'll return a partial data structure that indicates loading state
+  onProgress?.('Preparing UI...', 80);
+  
+  // Start background loading of all chunks
+  backgroundLoadPromise = loadAllChunksInBackground(baseUrl);
+  backgroundLoadPromise.then(completeData => {
+    notifyBackgroundLoadComplete(completeData);
+  }).catch(error => {
+    console.warn('Background loading failed:', error);
+  });
+  
+  onProgress?.('UI Ready', 100);
+  
+  // Return partial data structure that the UI can work with
+  return {
+    u: { _loading: true, _partial: true },
+    s: { _loading: true, _partial: true }
+  };
+}
+
+async function loadAllChunksInBackground(baseUrl: string): Promise<{u: any, s: any}> {
+  try {
+    console.log('Background loading of all chunks started');
+    
+    const chunks: Uint8Array[] = [];
+    
+    // Load all 6 chunks
+    for (let i = 1; i <= 6; i++) {
+      const chunkUrl = `${baseUrl.replace('.b64', `_part${i}.b64`)}`;
+      const chunkData = await downloadChunk(chunkUrl);
+      const decryptedChunk = await decryptChunk(new TextDecoder().decode(chunkData));
+      chunks.push(decryptedChunk);
     }
-  }).pipeThrough(new DecompressionStream('gzip'));
-  const decompressedBlob = await new Response(stream).blob();
-  onProgress?.('Parsing JSON...', 0);
-  const jsonString = await decompressedBlob.text();
-  const combined = JSON.parse(jsonString);
-  onProgress?.('Data loaded', 100);
-  return { u: combined.u, s: combined.s };
+    
+    // Combine all chunks
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const combined = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      combined.set(chunk, offset);
+      offset += chunk.length;
+    }
+    
+    // Decompress and parse
+    const decompressedResponse = new Response(combined);
+    const decompressed = await decompressedResponse.arrayBuffer();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(decompressed));
+        controller.close();
+      }
+    }).pipeThrough(new DecompressionStream('gzip'));
+    const decompressedBlob = await new Response(stream).blob();
+    const jsonString = await decompressedBlob.text();
+    const combinedData = JSON.parse(jsonString);
+    
+    console.log('Background loading completed successfully');
+    return { u: combinedData.u, s: combinedData.s };
+    
+  } catch (error) {
+    console.warn('Background loading failed:', error);
+    throw error;
+  }
+}
+
+async function loadDataFromUrl(baseUrl: string, onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
+  // Check if we already have complete data from background loading
+  if (isBackgroundLoadingComplete && completeDataCache) {
+    onProgress?.('Using cached complete data', 100);
+    return completeDataCache;
+  }
+  
+  // If background loading is in progress, wait for it
+  if (backgroundLoadPromise) {
+    onProgress?.('Waiting for background data...', 50);
+    const completeData = await backgroundLoadPromise;
+    onProgress?.('Complete data loaded', 100);
+    return completeData;
+  }
+  
+  // If no background loading, load priority chunk only for fast UI
+  onProgress?.('Loading priority data for fast UI...', 0);
+  return loadPriorityChunkOnly(baseUrl, onProgress);
+}
+
+// Function to get complete data (waits for background loading if needed)
+async function getCompleteData(): Promise<{u: any, s: any} | null> {
+  if (isBackgroundLoadingComplete && completeDataCache) {
+    return completeDataCache;
+  }
+  
+  if (backgroundLoadPromise) {
+    return await backgroundLoadPromise;
+  }
+  
+  return null;
 }
 
 let dataCache: {u: any, s: any} | null = null;
+let isPartialData = false;
 
 async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
-  if (dataCache) return dataCache;
+  if (dataCache && !isPartialData) return dataCache;
 
   // Try to load from IndexedDB cache first
   const cachedEntry = await getCachedDataEntry();
@@ -156,6 +271,7 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
 
   if (cachedEntry && cachedEntry.data) {
     dataCache = cachedEntry.data;
+    isPartialData = false;
     onProgress?.('Data loaded from cache', 100);
 
     // Check if cache is stale (older than 24 hours)
@@ -173,22 +289,61 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
     return dataCache!;
   }
 
-  // If not in cache, fetch from URL
+  // If not in cache, fetch from URL with priority loading
   onProgress?.('Fetching data from network...', 0);
-  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
-  dataCache = await loadDataFromUrl(url, onProgress);
+  const baseUrl = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+  const loadedData = await loadDataFromUrl(baseUrl, onProgress);
+  
+  // Check if this is partial data
+  if (loadedData.u._partial && loadedData.s._partial) {
+    dataCache = loadedData;
+    isPartialData = true;
+    
+    // Set up listener for when complete data is available
+    addBackgroundLoadListener((completeData) => {
+      dataCache = completeData;
+      isPartialData = false;
+      // Cache the complete data
+      setCachedData(completeData);
+    });
+    
+    return loadedData;
+  } else {
+    dataCache = loadedData;
+    isPartialData = false;
+    // Cache the complete data
+    await setCachedData(dataCache);
+    return dataCache;
+  }
+}
 
-  // Cache the data for future use
-  await setCachedData(dataCache);
+// Function to check if current data is partial
+function isDataPartial(): boolean {
+  return isPartialData;
+}
 
-  return dataCache;
+// Function to get complete data (blocks if background loading is in progress)
+async function ensureCompleteData(): Promise<{u: any, s: any}> {
+  if (!isPartialData && dataCache) {
+    return dataCache;
+  }
+  
+  const completeData = await getCompleteData();
+  if (completeData) {
+    dataCache = completeData;
+    isPartialData = false;
+    return completeData;
+  }
+  
+  // Fallback to getData if no background loading
+  return getData();
 }
 
 // Background fetch function
 async function fetchFreshData(): Promise<void> {
   try {
-    const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
-    const freshData: {u: any, s: any} = await loadDataFromUrl(url);
+    const baseUrl = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+    const freshData: {u: any, s: any} = await loadDataFromUrl(baseUrl);
 
     // Update cache with fresh data
     await setCachedData(freshData);
@@ -278,20 +433,29 @@ class FundDataProcessor {
     "dividend reinvest": "Dividend reinvest"
   };
 
-  async getInstrumentsDaily(onProgress?: (phase: string, percent: number) => void) {
+  // Method to get quick data for UI (can work with partial data)
+  async getQuickData(onProgress?: (phase: string, percent: number) => void) {
     const data = await getData(onProgress);
+    return data;
+  }
+
+  async getInstrumentsDaily(onProgress?: (phase: string, percent: number) => void) {
+    // Ensure we have complete data for instrument operations
+    const data = await ensureCompleteData();
     let e = data.u.n9 || [];
     return e;
   }
 
   async getInstrumentsMeta(onProgress?: (phase: string, percent: number) => void) {
-    const data = await getData(onProgress);
+    // Ensure we have complete data for meta operations
+    const data = await ensureCompleteData();
     let e = data.s.n9 || [];
     return e;
   }
 
   async getFactsheetData(onProgress?: (phase: string, percent: number) => void) {
-    const data = await getData(onProgress);
+    // Ensure we have complete data for factsheet operations
+    const data = await ensureCompleteData();
     // @ts-ignore
     return data.u.FC || [];
   }
