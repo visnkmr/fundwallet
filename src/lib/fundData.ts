@@ -192,17 +192,6 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
   // If not in cache, fetch from URL
   onProgress?.('Fetching data from network...', 0);
   const url = '';
-  dataCache = await loadDataFromUrl(url, onProgress);
-
-  // Cache the data for future use
-  await setCachedData(dataCache);
-
-  return dataCache;
-}
-
-// Background fetch function
-async function fetchFreshData(): Promise<void> {
-  try {
     const url = fundDataProcessor.getDataUrl();
     const freshData: {u: any, s: any} = await loadDataFromUrl(url);
 
