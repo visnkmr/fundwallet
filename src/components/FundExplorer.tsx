@@ -23,6 +23,7 @@ export default function FundExplorer() {
   const [uploadedUJson, setUploadedUJson] = useState<any>(null);
   const [fundChanges, setFundChanges] = useState<Map<string, any>>(new Map());
   const [activeTab, setActiveTab] = useState<'all' | 'changes'>('all');
+  const [dataUrl, setDataUrl] = useState<string>('');
 
   // Load data
   useEffect(() => {
@@ -51,8 +52,13 @@ export default function FundExplorer() {
     loadData();
   }, []);
 
-  // Load filters from local storage on client side only
+  // Load data URL and filters from local storage on client side only
   useEffect(() => {
+    const storedUrl = localStorage.getItem('fundwallet-data-url');
+    if (storedUrl) {
+      setDataUrl(storedUrl);
+      fundDataProcessor.setDataUrl(storedUrl);
+    }
     if (allFunds.length === 0) return;
     const storedFilters = loadFiltersFromStorage();
     if (storedFilters && Object.keys(storedFilters).length > 0) {
@@ -379,6 +385,13 @@ export default function FundExplorer() {
     }
   };
 
+  // Handle data URL change
+  const handleDataUrlChange = (url: string) => {
+    setDataUrl(url);
+    fundDataProcessor.setDataUrl(url);
+    localStorage.setItem('fundwallet-data-url', url);
+  };
+
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 's' | 'u') => {
     const file = event.target.files?.[0];
@@ -588,6 +601,14 @@ export default function FundExplorer() {
                    title="Upload custom u.json"
                  />
                </div>
+               <input
+                 type="text"
+                 value={dataUrl}
+                 onChange={(e) => handleDataUrlChange(e.target.value)}
+                 placeholder="Data URL"
+                 className="ml-4 px-2 py-1 text-sm border border-gray-300 rounded"
+                 title="URL for funds data binary"
+               />
             </div>
           </div>
         </div>

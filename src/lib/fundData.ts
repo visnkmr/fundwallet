@@ -153,8 +153,8 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
     // Local dev: load from local JSON files without caching or binary parsing
     try {
-      const uModule = await import('/u2.json');
-      const sModule = await import('/s2.json');
+      const uModule = await import('/u.json');
+      const sModule = await import('/s.json');
       const u = uModule.default;
       const s = sModule.default;
       dataCache = { u, s };
@@ -191,7 +191,7 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
 
   // If not in cache, fetch from URL
   onProgress?.('Fetching data from network...', 0);
-  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+  const url = '';
   dataCache = await loadDataFromUrl(url, onProgress);
 
   // Cache the data for future use
@@ -203,7 +203,7 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
 // Background fetch function
 async function fetchFreshData(): Promise<void> {
   try {
-    const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+    const url = fundDataProcessor.getDataUrl();
     const freshData: {u: any, s: any} = await loadDataFromUrl(url);
 
     // Update cache with fresh data
@@ -224,6 +224,15 @@ class FundDataProcessor {
   private cachedFunds: FundData[] | null = null;
   private cachedFilterOptions: FilterOptions | null = null;
   private cachedRangeValues: any | null = null;
+  private dataUrl: string = '';
+
+  setDataUrl(url: string) {
+    this.dataUrl = url;
+  }
+
+  getDataUrl(): string {
+    return this.dataUrl;
+  }
 
   private amcToIconIndex = {
     AXISMUTUALFUND_MF: 0,
