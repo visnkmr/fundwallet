@@ -149,7 +149,23 @@ let dataCache: {u: any, s: any} | null = null;
 async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
   if (dataCache) return dataCache;
 
-  // Try to load from IndexedDB cache first
+  // Check if running locally (non-prod environment)
+  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    // Local dev: load from local JSON files without caching or binary parsing
+    try {
+      const uModule = await import('/u2.json');
+      const sModule = await import('/s2.json');
+      const u = uModule.default;
+      const s = sModule.default;
+      dataCache = { u, s };
+      return dataCache;
+    } catch (error) {
+      console.warn('Failed to load local JSON files:', error);
+      // Fall back to production logic
+    }
+  }
+
+  // Production: Try to load from IndexedDB cache first
   const cachedEntry = await getCachedDataEntry();
   const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
   const now = Date.now();
