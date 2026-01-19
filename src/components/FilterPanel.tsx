@@ -145,9 +145,15 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
            <option value="minInvestment-desc">Min Investment (High to Low)</option>
            <option value="exitLoad-asc">Exit Load (Low to High)</option>
            <option value="exitLoad-desc">Exit Load (High to Low)</option>
-           <option value="expenseRatio-asc">Expense Ratio (Low to High)</option>
-           <option value="expenseRatio-desc">Expense Ratio (High to Low)</option>
-         </select>
+            <option value="expenseRatio-asc">Expense Ratio (Low to High)</option>
+            <option value="expenseRatio-desc">Expense Ratio (High to Low)</option>
+            <option value="priceChange-asc">Price Change (Low to High)</option>
+            <option value="priceChange-desc">Price Change (High to Low)</option>
+            <option value="expenseRatioChange-asc">Expense Ratio Change (Low to High)</option>
+            <option value="expenseRatioChange-desc">Expense Ratio Change (High to Low)</option>
+            <option value="aumChange-asc">AUM Change (Low to High)</option>
+            <option value="aumChange-desc">AUM Change (High to Low)</option>
+          </select>
        </div>
 
       {isExpanded && (

@@ -239,10 +239,52 @@ export default function FundExplorer() {
             return bExitLoadDesc - aExitLoadDesc;
           case 'expenseRatio-asc':
             return a.expenseRatio - b.expenseRatio;
-          case 'expenseRatio-desc':
-            return b.expenseRatio - a.expenseRatio;
-          default:
-            return 0;
+           case 'expenseRatio-desc':
+             return b.expenseRatio - a.expenseRatio;
+           case 'priceChange-asc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.lastPrice;
+             const bChange = fundChanges.get(b.tradingSymbol)?.lastPrice;
+             const aVal = aChange ? aChange.new - aChange.old : Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : Number.MAX_VALUE;
+             return aVal - bVal;
+           }
+           case 'priceChange-desc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.lastPrice;
+             const bChange = fundChanges.get(b.tradingSymbol)?.lastPrice;
+             const aVal = aChange ? aChange.new - aChange.old : -Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : -Number.MAX_VALUE;
+             return bVal - aVal;
+           }
+           case 'expenseRatioChange-asc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.expenseRatio;
+             const bChange = fundChanges.get(b.tradingSymbol)?.expenseRatio;
+             const aVal = aChange ? aChange.new - aChange.old : Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : Number.MAX_VALUE;
+             return aVal - bVal;
+           }
+           case 'expenseRatioChange-desc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.expenseRatio;
+             const bChange = fundChanges.get(b.tradingSymbol)?.expenseRatio;
+             const aVal = aChange ? aChange.new - aChange.old : -Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : -Number.MAX_VALUE;
+             return bVal - aVal;
+           }
+           case 'aumChange-asc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.aum;
+             const bChange = fundChanges.get(b.tradingSymbol)?.aum;
+             const aVal = aChange ? aChange.new - aChange.old : Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : Number.MAX_VALUE;
+             return aVal - bVal;
+           }
+           case 'aumChange-desc': {
+             const aChange = fundChanges.get(a.tradingSymbol)?.aum;
+             const bChange = fundChanges.get(b.tradingSymbol)?.aum;
+             const aVal = aChange ? aChange.new - aChange.old : -Number.MAX_VALUE;
+             const bVal = bChange ? bChange.new - bChange.old : -Number.MAX_VALUE;
+             return bVal - aVal;
+           }
+           default:
+             return 0;
         }
       });
     }
