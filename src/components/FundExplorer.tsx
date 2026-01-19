@@ -23,7 +23,9 @@ export default function FundExplorer() {
   const [uploadedUJson, setUploadedUJson] = useState<any>(null);
   const [fundChanges, setFundChanges] = useState<Map<string, any>>(new Map());
   const [activeTab, setActiveTab] = useState<'all' | 'changes'>('all');
-  const [dataUrl, setDataUrl] = useState<string>('');
+  const [dataUrl, setDataUrl] = useState<string>('https://fundwaldata.t3.storage.dev/data.b64');
+  const [sUrl, setSUrl] = useState<string>('');
+  const [uUrl, setUUrl] = useState<string>('');
 
   // Load data
   useEffect(() => {
@@ -52,12 +54,22 @@ export default function FundExplorer() {
     loadData();
   }, []);
 
-  // Load data URL and filters from local storage on client side only
+  // Load URLs and filters from local storage on client side only
   useEffect(() => {
-    const storedUrl = localStorage.getItem('fundwallet-data-url');
-    if (storedUrl) {
-      setDataUrl(storedUrl);
-      fundDataProcessor.setDataUrl(storedUrl);
+    const storedDataUrl = localStorage.getItem('fundwallet-data-url');
+    if (storedDataUrl) {
+      setDataUrl(storedDataUrl);
+      fundDataProcessor.setDataUrl(storedDataUrl);
+    }
+    const storedSUrl = localStorage.getItem('fundwallet-s-url');
+    if (storedSUrl) {
+      setSUrl(storedSUrl);
+      handleUrlUpload(storedSUrl, 's');
+    }
+    const storedUUrl = localStorage.getItem('fundwallet-u-url');
+    if (storedUUrl) {
+      setUUrl(storedUUrl);
+      handleUrlUpload(storedUUrl, 'u');
     }
     if (allFunds.length === 0) return;
     const storedFilters = loadFiltersFromStorage();
@@ -392,6 +404,30 @@ export default function FundExplorer() {
     localStorage.setItem('fundwallet-data-url', url);
   };
 
+  // Handle URL upload for s/u json
+  const handleUrlUpload = async (url: string, type: 's' | 'u') => {
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const json = await response.json();
+      if (type === 's') {
+        setUploadedSJson(json.n9);
+        setSUrl(url);
+        localStorage.setItem('fundwallet-s-url', url);
+      } else {
+        setUploadedUJson(json.n9);
+        setUUrl(url);
+        localStorage.setItem('fundwallet-u-url', url);
+      }
+      // Trigger comparison
+      if ((type === 's' && uploadedUJson) || (type === 'u' && uploadedSJson)) {
+        compareData();
+      }
+    } catch (error) {
+      alert(`Error fetching ${type}.json from URL: ${error}`);
+    }
+  };
+
   // Handle file upload
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 's' | 'u') => {
     const file = event.target.files?.[0];
@@ -608,6 +644,24 @@ export default function FundExplorer() {
                  placeholder="Data URL"
                  className="ml-4 px-2 py-1 text-sm border border-gray-300 rounded"
                  title="URL for funds data binary"
+               />
+               <input
+                 type="text"
+                 value={sUrl}
+                 onChange={(e) => setSUrl(e.target.value)}
+                 onBlur={(e) => handleUrlUpload(e.target.value, 's')}
+                 placeholder="s.json URL"
+                 className="ml-2 px-2 py-1 text-sm border border-gray-300 rounded"
+                 title="URL for s.json"
+               />
+               <input
+                 type="text"
+                 value={uUrl}
+                 onChange={(e) => setUUrl(e.target.value)}
+                 onBlur={(e) => handleUrlUpload(e.target.value, 'u')}
+                 placeholder="u.json URL"
+                 className="ml-2 px-2 py-1 text-sm border border-gray-300 rounded"
+                 title="URL for u.json"
                />
             </div>
           </div>
