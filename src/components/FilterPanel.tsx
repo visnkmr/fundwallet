@@ -565,10 +565,49 @@ export default function FilterPanel({ filters, onFiltersChange, filterOptions, r
                        <span className="text-sm text-gray-700">SIP Not Available</span>
                      </label>
                    </div>
-                 </div>
-               </div>
+                  </div>
+                </div>
 
-               {/* Sub Scheme Filter */}
+                {/* Change Types Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Change Types</label>
+                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">
+                    {[
+                      'lastPrice',
+                      'oneYearPercent',
+                      'twoYearPercent',
+                      'threeYearPercent',
+                      'aum',
+                      'lastDividendDate',
+                      'lastDividendPercent',
+                      'purchaseAllowed',
+                      'redemptionAllowed',
+                      'amcSipFlag',
+                      'expenseRatio'
+                    ].map((field) => (
+                      <label key={field} className="flex items-center hover:bg-gray-50 p-1 rounded">
+                        <input
+                          type="checkbox"
+                          checked={filters.changedFields?.includes(field) || false}
+                          onChange={(e) => {
+                            const currentValues = filters.changedFields || [];
+                            const newValues = e.target.checked
+                              ? [...currentValues, field]
+                              : currentValues.filter(v => v !== field);
+                            onFiltersChange({
+                              ...filters,
+                              changedFields: newValues.length > 0 ? newValues : undefined
+                            });
+                          }}
+                          className="mr-2 rounded text-orange-500 focus:ring-orange-500"
+                        />
+                        <span className="text-sm text-gray-700">{field.replace(/([A-Z])/g, ' $1').toLowerCase()}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sub Scheme Filter */}
                <div>
                  <label className="block text-sm font-medium text-gray-700 mb-2">Sub Scheme</label>
                  <div className="max-h-40 overflow-y-auto space-y-2 border border-gray-200 rounded-lg p-3">

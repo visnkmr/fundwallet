@@ -82,9 +82,10 @@ export interface FundFilters {
   settlementType?: string[];
   purchaseAllowed?: boolean[];
   redemptionAllowed?: boolean[];
-  amcSipFlag?: boolean[];
-  subScheme?: string[];
-  lockIn?: number[];
+   amcSipFlag?: boolean[];
+   subScheme?: string[];
+   lockIn?: number[];
+   changedFields?: string[];
 }
 
 export interface RangeValues {

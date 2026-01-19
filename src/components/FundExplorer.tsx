@@ -19,6 +19,10 @@ export default function FundExplorer() {
   const [loadingPhase, setLoadingPhase] = useState('');
   const [loadingPercent, setLoadingPercent] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploadedSJson, setUploadedSJson] = useState<any>(null);
+  const [uploadedUJson, setUploadedUJson] = useState<any>(null);
+  const [fundChanges, setFundChanges] = useState<Map<string, any>>(new Map());
+  const [activeTab, setActiveTab] = useState<'all' | 'changes'>('all');
 
   // Load data
   useEffect(() => {
@@ -246,6 +250,23 @@ export default function FundExplorer() {
     setFilteredFunds(result);
   }, [allFunds, filters]);
 
+  // Compare data when uploaded or funds change
+  useEffect(() => {
+    if (uploadedSJson && uploadedUJson && allFunds.length) {
+      compareData();
+    }
+  }, [uploadedSJson, uploadedUJson, allFunds]);
+
+  // Compute display funds based on tab
+  const changesFilter = (fund: FundData) => {
+    const change = fundChanges.get(fund.tradingSymbol);
+    if (!change) return false;
+    if (!filters.changedFields || filters.changedFields.length === 0) return true;
+    return filters.changedFields.some(field => change.hasOwnProperty(field));
+  };
+  const displayFunds = activeTab === 'changes' ? filteredFunds.filter(changesFilter) : filteredFunds;
+  const changesCount = filteredFunds.filter(changesFilter).length;
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -316,6 +337,63 @@ export default function FundExplorer() {
     }
   };
 
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>, type: 's' | 'u') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+      if (type === 's') {
+        setUploadedSJson(json.n9);
+      } else {
+        setUploadedUJson(json.n9);
+      }
+      // Trigger comparison if both are uploaded
+      if ((type === 's' && uploadedUJson) || (type === 'u' && uploadedSJson)) {
+        compareData();
+      }
+    } catch (error) {
+      alert(`Error parsing ${type}.json: ${error}`);
+    }
+  };
+
+  // Compare uploaded data with current
+  const compareData = () => {
+    if (!uploadedSJson || !uploadedUJson || !allFunds.length) return;
+
+    const changes = new Map<string, any>();
+    allFunds.forEach(fund => {
+      const uploadedU = uploadedUJson.find((u: any) => u[0] === fund.tradingSymbol);
+      const uploadedS = uploadedSJson.find((s: any) => s[0] === fund.tradingSymbol);
+      if (uploadedU && uploadedS) {
+        const change: any = {};
+        // Compare prices (with epsilon for floats)
+        if (Math.abs(uploadedU[5] - fund.lastPrice) > 0.01) change.lastPrice = { old: fund.lastPrice, new: uploadedU[5] };
+        // Compare returns (with epsilon)
+        if (Math.abs(uploadedU[8] - fund.oneYearPercent) > 0.01) change.oneYearPercent = { old: fund.oneYearPercent, new: uploadedU[8] };
+        // Compare other returns
+        if (Math.abs(uploadedU[9] - fund.twoYearPercent) > 0.01) change.twoYearPercent = { old: fund.twoYearPercent, new: uploadedU[9] };
+        if (Math.abs(uploadedU[10] - fund.threeYearPercent) > 0.01) change.threeYearPercent = { old: fund.threeYearPercent, new: uploadedU[10] };
+        // Compare AUM
+        if (Math.abs((10000000 * uploadedU[13]) - fund.aum) > 100000) change.aum = { old: fund.aum, new: 10000000 * uploadedU[13] };
+        // Compare dividend
+        if (uploadedU[3] !== fund.lastDividendDate) change.lastDividendDate = { old: fund.lastDividendDate, new: uploadedU[3] };
+        if (Math.abs(uploadedU[4] - fund.lastDividendPercent) > 0.01) change.lastDividendPercent = { old: fund.lastDividendPercent, new: uploadedU[4] };
+        // Compare statuses
+        if ((uploadedU[1] === 1) !== fund.purchaseAllowed) change.purchaseAllowed = { old: fund.purchaseAllowed, new: uploadedU[1] === 1 };
+        if ((uploadedU[2] === 1) !== fund.redemptionAllowed) change.redemptionAllowed = { old: fund.redemptionAllowed, new: uploadedU[2] === 1 };
+        // Compare SIP
+        if ((uploadedS[18] === 1) !== fund.amcSipFlag) change.amcSipFlag = { old: fund.amcSipFlag, new: uploadedS[18] === 1 };
+        // Compare expense ratio
+        if (Math.abs(uploadedS[17] - fund.expenseRatio) > 0.01) change.expenseRatio = { old: fund.expenseRatio, new: uploadedS[17] };
+        if (Object.keys(change).length > 0) changes.set(fund.tradingSymbol, change);
+      }
+    });
+    setFundChanges(changes);
+  };
+
   // Refresh data from remote
   const refreshData = async () => {
     setRefreshing(true);
@@ -380,7 +458,6 @@ export default function FundExplorer() {
     }
     if (filters.subScheme?.length) activeFilters.push(`Sub-scheme: ${filters.subScheme.join(', ')}`);
     if (filters.lockIn?.length) activeFilters.push(`Lock-in: ${filters.lockIn.join(', ')} days`);
-    if (filters.manager?.length) activeFilters.push(`Manager: ${filters.manager.join(', ')}`);
     if (filters.excludeStrings?.length) activeFilters.push(`Exclude: ${filters.excludeStrings.join(', ')}`);
     if (filters.oneYearReturn) activeFilters.push(`1Y Return: ${filters.oneYearReturn[0]}% - ${filters.oneYearReturn[1]}%`);
     if (filters.expenseRatioRange) activeFilters.push(`Expense Ratio: ${filters.expenseRatioRange[0]}% - ${filters.expenseRatioRange[1]}%`);
@@ -389,6 +466,7 @@ export default function FundExplorer() {
     if (filters.minInvestmentRange) activeFilters.push(`Min Investment: ₹${filters.minInvestmentRange[0].toLocaleString()} - ₹${filters.minInvestmentRange[1].toLocaleString()}`);
     if (filters.navRange) activeFilters.push(`NAV: ₹${filters.navRange[0].toFixed(2)} - ₹${filters.navRange[1].toFixed(2)}`);
     if (filters.launchYearRange) activeFilters.push(`Launch Year: ${filters.launchYearRange[0]} - ${filters.launchYearRange[1]}`);
+    if (filters.changedFields?.length) activeFilters.push(`Changed Fields: ${filters.changedFields.join(', ')}`);
     if (filters.sort) activeFilters.push(`Sort: ${filters.sort.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`);
 
     return {
@@ -435,23 +513,39 @@ export default function FundExplorer() {
                 <div className="text-sm text-gray-500">Total Funds</div>
                 <div className="text-2xl font-bold text-blue-600">{allFunds.length}</div>
               </div>
-              <button
-                onClick={refreshData}
-                disabled={refreshing}
-                className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                title="Refresh data from remote server"
-              >
-                {refreshing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    Refreshing...
-                  </>
-                ) : (
-                  <>
-                    🔄 Refresh
-                  </>
-                )}
-              </button>
+               <button
+                 onClick={refreshData}
+                 disabled={refreshing}
+                 className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                 title="Refresh data from remote server"
+               >
+                 {refreshing ? (
+                   <>
+                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                     Refreshing...
+                   </>
+                 ) : (
+                   <>
+                     🔄 Refresh
+                   </>
+                 )}
+               </button>
+               <div className="flex gap-2">
+                 <input
+                   type="file"
+                   accept=".json"
+                   onChange={(e) => handleFileUpload(e, 's')}
+                   className="text-sm"
+                   title="Upload custom s.json"
+                 />
+                 <input
+                   type="file"
+                   accept=".json"
+                   onChange={(e) => handleFileUpload(e, 'u')}
+                   className="text-sm"
+                   title="Upload custom u.json"
+                 />
+               </div>
             </div>
           </div>
         </div>
@@ -511,11 +605,39 @@ export default function FundExplorer() {
           />
         )}
 
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'all'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                All Funds ({filteredFunds.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('changes')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'changes'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Changes Only ({changesCount})
+              </button>
+            </nav>
+          </div>
+        </div>
+
         {/* Results Summary */}
         <div className="mb-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-800">
-              {filteredFunds.length} Funds Found
+              {displayFunds.length} Funds Found
             </h2>
             <div className="text-sm text-gray-500">
               Sorted by: {filters.sort ? filters.sort.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Relevance'}
@@ -525,12 +647,12 @@ export default function FundExplorer() {
 
         {/* Fund List */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredFunds.slice(0, 50).map((fund) => (
-            <FundCard fund={fund} onManagerClick={handleManagerSort}/>
+          {displayFunds.slice(0, 50).map((fund) => (
+            <FundCard fund={fund} onManagerClick={handleManagerSort} changes={fundChanges.get(fund.tradingSymbol)}/>
           ))}
         </div>
 
-        {filteredFunds.length > 50 && (
+        {displayFunds.length > 50 && (
           <div className="text-center mt-8">
             <p className="text-gray-500">Showing first 50 results. Use filters to narrow down results.</p>
           </div>

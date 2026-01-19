@@ -4,9 +4,10 @@ import { FundData } from '@/types/fund';
 interface FundCardProps {
   fund: FundData;
   onManagerClick?: (manager: string) => void;
+  changes?: any;
 }
 
-export default function FundCard({ fund, onManagerClick }: FundCardProps) {
+export default function FundCard({ fund, onManagerClick, changes }: FundCardProps) {
   const [showDetails, setShowDetails] = useState(false);
 
   const formatCurrency = (value: number) => {
@@ -88,9 +89,21 @@ export default function FundCard({ fund, onManagerClick }: FundCardProps) {
                 ✓ SIP Available
               </span>
             )}
-          </div>
-        </div>
-        <div className="text-right">
+           </div>
+           {changes && (
+             <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded">
+               <h4 className="text-sm font-medium text-yellow-800">Changes:</h4>
+               <ul className="text-xs text-yellow-700">
+                 {Object.entries(changes).map(([key, val]: [string, any]) => (
+                   <li key={key}>
+                     {key.replace(/([A-Z])/g, ' $1').toLowerCase()}: {typeof val.old === 'boolean' ? (val.old ? 'Yes' : 'No') : val.old} → {typeof val.new === 'boolean' ? (val.new ? 'Yes' : 'No') : val.new}
+                   </li>
+                 ))}
+               </ul>
+             </div>
+           )}
+         </div>
+         <div className="text-right">
           <div className="text-2xl font-bold text-gray-800">{formatCurrency(fund.lastPrice)}</div>
           <div className={`text-sm font-medium ${getChangeColor(fund.changePercent)}`}>
             {formatPercent(fund.changePercent)}
