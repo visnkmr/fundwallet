@@ -146,24 +146,30 @@ async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent
 
 let dataCache: {u: any, s: any} | null = null;
 
+// Background fetch function
+async function fetchFreshData(): Promise<void> {
+  try {
+    const url = fundDataProcessor.getDataUrl();
+    const freshData: {u: any, s: any} = await loadDataFromUrl(url);
+
+    // Update cache with fresh data
+    await setCachedData(freshData);
+
+    // Update in-memory cache if it exists
+    if (dataCache) {
+      dataCache = freshData;
+    }
+
+    console.log('Fresh data fetched and cached successfully');
+  } catch (error) {
+    console.warn('Failed to fetch fresh data:', error);
+  }
+}
+
 async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
   if (dataCache) return dataCache;
 
-  // Check if running locally (non-prod environment)
-  if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    // Local dev: load from local JSON files without caching or binary parsing
-    try {
-      const uModule = await import('/u.json');
-      const sModule = await import('/s.json');
-      const u = uModule.default;
-      const s = sModule.default;
-      dataCache = { u, s };
-      return dataCache;
-    } catch (error) {
-      console.warn('Failed to load local JSON files:', error);
-      // Fall back to production logic
-    }
-  }
+  // Local loading removed - use URL inputs instead
 
   // Production: Try to load from IndexedDB cache first
   const cachedEntry = await getCachedDataEntry();
@@ -190,8 +196,8 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
   }
 
   // If not in cache, fetch from URL
-  onProgress?.('Fetching data from network...', 0);
-  const url = '';
+  try {
+    onProgress?.('Fetching data from network...', 0);
     const url = fundDataProcessor.getDataUrl();
     const freshData: {u: any, s: any} = await loadDataFromUrl(url);
 
@@ -204,8 +210,10 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
     }
 
     console.log('Fresh data fetched and cached successfully');
+    return freshData;
   } catch (error) {
     console.warn('Failed to fetch fresh data:', error);
+    throw error;
   }
 }
 
@@ -213,7 +221,7 @@ class FundDataProcessor {
   private cachedFunds: FundData[] | null = null;
   private cachedFilterOptions: FilterOptions | null = null;
   private cachedRangeValues: any | null = null;
-  private dataUrl: string = '';
+  private dataUrl: string = 'https://fundwaldata.t3.storage.dev/data.b64';
 
   setDataUrl(url: string) {
     this.dataUrl = url;
