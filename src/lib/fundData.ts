@@ -175,7 +175,7 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
 
   // If not in cache, fetch from URL
   onProgress?.('Fetching data from network...', 0);
-  const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+  const url = 'https://fundwaldata.t3.storage.dev/data.b64';
   dataCache = await loadDataFromUrl(url, onProgress);
 
   // Cache the data for future use
@@ -187,7 +187,7 @@ async function getData(onProgress?: (phase: string, percent: number) => void): P
 // Background fetch function
 async function fetchFreshData(): Promise<void> {
   try {
-    const url = 'https://cdn.jsdelivr.net/gh/visnkmr/fasttest@main/data.b64';
+    const url = 'https://fundwaldata.t3.storage.dev/data.b64';
     const freshData: {u: any, s: any} = await loadDataFromUrl(url);
 
     // Update cache with fresh data
