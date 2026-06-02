@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
 import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor, clearAllCaches } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
+import FilterPresets from './FilterPresets';
 import FundList from './FundList';
 import FundCard from './FundCard';
 
@@ -816,6 +817,9 @@ export default function FundExplorer() {
             </div>
           );
         })()}
+
+        {/* Filter Presets */}
+        <FilterPresets filters={filters} onFiltersChange={setFilters} />
 
         {/* Filter Panel */}
         {rangeValues && filterOptions && (
