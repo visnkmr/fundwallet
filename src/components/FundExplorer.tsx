@@ -2,91 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
-import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor } from '@/lib/fundData';
+import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor, clearAllCaches } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
 import FundList from './FundList';
 import FundCard from './FundCard';
 
-function filtersToSearchParams(filters: FundFilters): string {
-  const params = new URLSearchParams();
-  if (filters.search) params.set('search', filters.search);
-  if (filters.excludeStrings?.length) params.set('exclude', filters.excludeStrings.join(','));
-  if (filters.sort) params.set('sort', filters.sort);
-  if (filters.amc?.length) params.set('amc', filters.amc.join(','));
-  if (filters.scheme?.length) params.set('scheme', filters.scheme.join(','));
-  if (filters.plan?.length) params.set('plan', filters.plan.join(','));
-  if (filters.dividendInterval?.length) params.set('div', filters.dividendInterval.join(','));
-  if (filters.risk?.length) params.set('risk', filters.risk.join(','));
-  if (filters.manager?.length) params.set('manager', filters.manager.join(','));
-  if (filters.settlementType?.length) params.set('settlement', filters.settlementType.join(','));
-  if (filters.purchaseAllowed?.length) params.set('purchase', filters.purchaseAllowed.map(Boolean).join(','));
-  if (filters.redemptionAllowed?.length) params.set('redemption', filters.redemptionAllowed.map(Boolean).join(','));
-  if (filters.amcSipFlag?.length) params.set('sip', filters.amcSipFlag.map(Boolean).join(','));
-  if (filters.subScheme?.length) params.set('subScheme', filters.subScheme.join(','));
-  if (filters.lockIn?.length) params.set('lockIn', filters.lockIn.join(','));
-  if (filters.changedFields?.length) params.set('changed', filters.changedFields.join(','));
-  if (filters.oneYearReturn) params.set('1yReturn', `${filters.oneYearReturn[0]}-${filters.oneYearReturn[1]}`);
-  if (filters.expenseRatioRange) params.set('expenseRatio', `${filters.expenseRatioRange[0]}-${filters.expenseRatioRange[1]}`);
-  if (filters.exitLoadRange) params.set('exitLoad', `${filters.exitLoadRange[0]}-${filters.exitLoadRange[1]}`);
-  if (filters.aumRange) params.set('aum', `${filters.aumRange[0]}-${filters.aumRange[1]}`);
-  if (filters.minInvestmentRange) params.set('minInv', `${filters.minInvestmentRange[0]}-${filters.minInvestmentRange[1]}`);
-  if (filters.navRange) params.set('nav', `${filters.navRange[0]}-${filters.navRange[1]}`);
-  if (filters.launchYearRange) params.set('launchYear', `${filters.launchYearRange[0]}-${filters.launchYearRange[1]}`);
-  return params.toString();
-}
-
-function filtersFromSearchParams(search: string): FundFilters | null {
-  const params = new URLSearchParams(search);
-  if ([...params.keys()].length === 0) return null;
-  const f: FundFilters = {};
-  const s = params.get('search');
-  if (s) f.search = s;
-  const exclude = params.get('exclude');
-  if (exclude) f.excludeStrings = exclude.split(',').filter(Boolean);
-  const sort = params.get('sort');
-  if (sort) f.sort = sort;
-  const amc = params.get('amc');
-  if (amc) f.amc = amc.split(',').filter(Boolean);
-  const scheme = params.get('scheme');
-  if (scheme) f.scheme = scheme.split(',').filter(Boolean);
-  const plan = params.get('plan');
-  if (plan) f.plan = plan.split(',').filter(Boolean);
-  const div = params.get('div');
-  if (div) f.dividendInterval = div.split(',').filter(Boolean);
-  const risk = params.get('risk');
-  if (risk) f.risk = risk.split(',').map(Number).filter(n => !isNaN(n));
-  const manager = params.get('manager');
-  if (manager) f.manager = manager.split(',').filter(Boolean);
-  const settlement = params.get('settlement');
-  if (settlement) f.settlementType = settlement.split(',').filter(Boolean);
-  const purchase = params.get('purchase');
-  if (purchase) f.purchaseAllowed = purchase.split(',').map(v => v === 'true');
-  const redemption = params.get('redemption');
-  if (redemption) f.redemptionAllowed = redemption.split(',').map(v => v === 'true');
-  const sip = params.get('sip');
-  if (sip) f.amcSipFlag = sip.split(',').map(v => v === 'true');
-  const subScheme = params.get('subScheme');
-  if (subScheme) f.subScheme = subScheme.split(',').filter(Boolean);
-  const lockIn = params.get('lockIn');
-  if (lockIn) f.lockIn = lockIn.split(',').map(Number).filter(n => !isNaN(n));
-  const changed = params.get('changed');
-  if (changed) f.changedFields = changed.split(',').filter(Boolean);
-  const oneYearReturn = params.get('1yReturn');
-  if (oneYearReturn) { const [lo, hi] = oneYearReturn.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.oneYearReturn = [lo, hi]; }
-  const expenseRatio = params.get('expenseRatio');
-  if (expenseRatio) { const [lo, hi] = expenseRatio.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.expenseRatioRange = [lo, hi]; }
-  const exitLoad = params.get('exitLoad');
-  if (exitLoad) { const [lo, hi] = exitLoad.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.exitLoadRange = [lo, hi]; }
-  const aum = params.get('aum');
-  if (aum) { const [lo, hi] = aum.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.aumRange = [lo, hi]; }
-  const minInv = params.get('minInv');
-  if (minInv) { const [lo, hi] = minInv.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.minInvestmentRange = [lo, hi]; }
-  const nav = params.get('nav');
-  if (nav) { const [lo, hi] = nav.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.navRange = [lo, hi]; }
-  const launchYear = params.get('launchYear');
-  if (launchYear) { const [lo, hi] = launchYear.split('-').map(Number); if (!isNaN(lo) && !isNaN(hi)) f.launchYearRange = [lo, hi]; }
-  return f;
-}
+const STORAGE_KEY = 'fundwallet-filters';
 
 export default function FundExplorer() {
   const [allFunds, setAllFunds] = useState<FundData[]>([]);
@@ -133,7 +54,7 @@ export default function FundExplorer() {
     loadData();
   }, []);
 
-  // Load URLs from local storage and filters from URL on client side only
+  // Load URLs and filters from local storage on client side only
   useEffect(() => {
     const storedDataUrl = localStorage.getItem('fundwallet-data-url');
     if (storedDataUrl) {
@@ -151,10 +72,12 @@ export default function FundExplorer() {
       handleUrlUpload(storedUUrl, 'u');
     }
     if (allFunds.length === 0) return;
-    const urlFilters = filtersFromSearchParams(window.location.search);
-    if (urlFilters && Object.keys(urlFilters).length > 0) {
-      setFilters(urlFilters);
+    const storedFilters = loadFiltersFromStorage();
+    if (storedFilters && Object.keys(storedFilters).length > 0) {
+      // Use stored filters if they exist
+      setFilters(storedFilters);
     } else {
+      // Set default filters if no stored filters exist
       setFilters({
         plan: ['Direct'],
         dividendInterval: ['Growth'],
@@ -164,11 +87,9 @@ export default function FundExplorer() {
     }
   }, []);
 
-  // Sync filters to URL whenever they change
+  // Save filters to local storage whenever they change
   useEffect(() => {
-    const params = filtersToSearchParams(filters);
-    const newUrl = params ? `${window.location.pathname}?${params}` : window.location.pathname;
-    window.history.replaceState(null, '', newUrl);
+    saveFiltersToStorage(filters);
   }, [filters]);
 
   useEffect(() => {
@@ -431,6 +352,26 @@ export default function FundExplorer() {
     }));
   };
 
+  // Save filters to local storage
+  const saveFiltersToStorage = (filters: FundFilters) => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+      console.error('Failed to save filters to local storage:', error);
+    }
+  };
+
+  // Load filters from local storage
+  const loadFiltersFromStorage = (): FundFilters | null => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch (error) {
+      console.error('Failed to load filters from local storage:', error);
+      return null;
+    }
+  };
+
   // Copy filters to clipboard as JSON
   const copyFiltersToClipboard = () => {
     try {
@@ -548,6 +489,10 @@ export default function FundExplorer() {
   const refreshData = async () => {
     setRefreshing(true);
     try {
+      // Clear caches to force fresh data
+      fundDataProcessor.clearCache();
+
+      // Reload data
       const funds = await getAllFunds((phase, percent) => {
         setLoadingPhase(phase);
         setLoadingPercent(percent);
@@ -571,6 +516,40 @@ export default function FundExplorer() {
     } catch (error) {
       console.error('Failed to refresh data:', error);
       alert('Failed to refresh data. Please check your internet connection.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Force update cache - clears all caches (including IndexedDB) and fetches fresh data
+  const forceUpdateCache = async () => {
+    setRefreshing(true);
+    try {
+      await clearAllCaches();
+
+      const funds = await getAllFunds((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const options = await getFilterOptions((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const ranges = await getRangeValues((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+
+      setAllFunds(funds);
+      setFilterOptions(options);
+      setRangeValues(ranges);
+      setFilteredFunds(funds);
+      setLoading(false);
+
+      alert('Cache updated successfully!');
+    } catch (error) {
+      console.error('Failed to force update cache:', error);
+      alert('Failed to update cache. Please check your internet connection.');
     } finally {
       setRefreshing(false);
     }
@@ -673,6 +652,23 @@ export default function FundExplorer() {
                  ) : (
                    <>
                      🔄 Refresh
+                   </>
+                 )}
+               </button>
+               <button
+                 onClick={forceUpdateCache}
+                 disabled={refreshing}
+                 className="px-3 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                 title="Force update cache - clears IndexedDB cache and fetches fresh data"
+               >
+                 {refreshing ? (
+                   <>
+                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                     Updating...
+                   </>
+                 ) : (
+                   <>
+                     ⚡ Force Update Cache
                    </>
                  )}
                </button>
