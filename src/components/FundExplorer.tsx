@@ -9,6 +9,52 @@ import FundCard from './FundCard';
 
 const STORAGE_KEY = 'fundwallet-filters';
 
+const ARRAY_KEYS = new Set<keyof FundFilters>(['amc', 'scheme', 'plan', 'dividendInterval', 'risk', 'manager', 'settlementType', 'purchaseAllowed', 'redemptionAllowed', 'amcSipFlag', 'subScheme', 'lockIn', 'changedFields', 'excludeStrings']);
+const NUMBER_ARRAY_KEYS = new Set<keyof FundFilters>(['risk', 'lockIn']);
+const BOOLEAN_ARRAY_KEYS = new Set<keyof FundFilters>(['purchaseAllowed', 'redemptionAllowed', 'amcSipFlag']);
+const RANGE_KEYS = new Set<keyof FundFilters>(['oneYearReturn', 'expenseRatioRange', 'exitLoadRange', 'aumRange', 'minInvestmentRange', 'navRange', 'launchYearRange']);
+
+function serializeFilters(filters: FundFilters): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value === undefined || value === null) continue;
+    if (RANGE_KEYS.has(key as keyof FundFilters)) {
+      const range = value as [number, number];
+      params.set(key, `${range[0]}-${range[1]}`);
+    } else if (ARRAY_KEYS.has(key as keyof FundFilters)) {
+      const arr = value as (string | number | boolean)[];
+      if (arr.length > 0) params.set(key, arr.join(','));
+    } else if (typeof value === 'string') {
+      params.set(key, value);
+    }
+  }
+  return params.toString();
+}
+
+function deserializeFilters(search: string): FundFilters | null {
+  if (!search) return null;
+  const params = new URLSearchParams(search);
+  if (Array.from(params.entries()).length === 0) return null;
+  const filters: FundFilters = {};
+  for (const [key, value] of params.entries()) {
+    if (RANGE_KEYS.has(key as keyof FundFilters)) {
+      const parts = value.split('-').map(Number);
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        (filters as any)[key] = [parts[0], parts[1]];
+      }
+    } else if (BOOLEAN_ARRAY_KEYS.has(key as keyof FundFilters)) {
+      (filters as any)[key] = value.split(',').map(v => v === 'true');
+    } else if (NUMBER_ARRAY_KEYS.has(key as keyof FundFilters)) {
+      (filters as any)[key] = value.split(',').map(Number);
+    } else if (ARRAY_KEYS.has(key as keyof FundFilters)) {
+      (filters as any)[key] = value.split(',');
+    } else {
+      (filters as any)[key] = value;
+    }
+  }
+  return filters;
+}
+
 export default function FundExplorer() {
   const [allFunds, setAllFunds] = useState<FundData[]>([]);
   const [filterOptions, setFilterOptions] = useState<any>(null);
@@ -54,7 +100,7 @@ export default function FundExplorer() {
     loadData();
   }, []);
 
-  // Load URLs and filters from local storage on client side only
+  // Load URLs and filters from local storage / URL on client side only
   useEffect(() => {
     const storedDataUrl = localStorage.getItem('fundwallet-data-url');
     if (storedDataUrl) {
@@ -71,25 +117,33 @@ export default function FundExplorer() {
       setUUrl(storedUUrl);
       handleUrlUpload(storedUUrl, 'u');
     }
-    if (allFunds.length === 0) return;
-    const storedFilters = loadFiltersFromStorage();
-    if (storedFilters && Object.keys(storedFilters).length > 0) {
-      // Use stored filters if they exist
-      setFilters(storedFilters);
+    // if (allFunds.length === 0) return;
+    // URL params take priority over localStorage
+    const urlFilters = deserializeFilters(window.location.search);
+    if (urlFilters && Object.keys(urlFilters).length > 0) {
+      setFilters(urlFilters);
+      saveFiltersToStorage(urlFilters);
     } else {
-      // Set default filters if no stored filters exist
-      setFilters({
-        plan: ['Direct'],
-        dividendInterval: ['Growth'],
-        sort: 'cagr1y-desc',
-        purchaseAllowed: [true]
-      });
+      const storedFilters = loadFiltersFromStorage();
+      if (storedFilters && Object.keys(storedFilters).length > 0) {
+        setFilters(storedFilters);
+      } else {
+        setFilters({
+          plan: ['Direct'],
+          dividendInterval: ['Growth'],
+          sort: 'cagr1y-desc',
+          purchaseAllowed: [true]
+        });
+      }
     }
   }, []);
 
-  // Save filters to local storage whenever they change
+  // Save filters to local storage and URL whenever they change
   useEffect(() => {
     saveFiltersToStorage(filters);
+    const query = serializeFilters(filters);
+    const newUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+    window.history.replaceState(null, '', newUrl);
   }, [filters]);
 
   useEffect(() => {
