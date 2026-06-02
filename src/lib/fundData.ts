@@ -5,90 +5,6 @@ const l = {
   qz: (str: string) => String(str).toLowerCase().replace(/[^a-z0-9]+/g, '-')
 };
 
-// IndexedDB utilities for offline caching
-const DB_NAME = 'FundWalletCache';
-const DB_VERSION = 1;
-const DATA_STORE = 'fundData';
-const CACHE_KEY = 'mainData';
-
-interface CachedData {
-  key: string;
-  data: any;
-  timestamp: number;
-  version: string;
-}
-
-function openDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
-
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(DATA_STORE)) {
-        db.createObjectStore(DATA_STORE, { keyPath: 'key' });
-      }
-    };
-  });
-}
-
-async function getCachedData(): Promise<{u: any, s: any} | null> {
-  const entry = await getCachedDataEntry();
-  return entry ? entry.data : null;
-}
-
-async function getCachedDataEntry(): Promise<CachedData | null> {
-  try {
-    const db = await openDB();
-    const transaction = db.transaction([DATA_STORE], 'readonly');
-    const store = transaction.objectStore(DATA_STORE);
-    const request = store.get(CACHE_KEY);
-
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => {
-        const result: CachedData | undefined = request.result;
-        if (result && result.data) {
-          console.log('Loaded data from IndexedDB cache');
-          resolve(result);
-        } else {
-          resolve(null);
-        }
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (error) {
-    console.warn('Failed to load from cache:', error);
-    return null;
-  }
-}
-
-async function setCachedData(data: {u: any, s: any}): Promise<void> {
-  try {
-    const db = await openDB();
-    const transaction = db.transaction([DATA_STORE], 'readwrite');
-    const store = transaction.objectStore(DATA_STORE);
-
-    const cachedData: CachedData = {
-      key: CACHE_KEY,
-      data,
-      timestamp: Date.now(),
-      version: '1.0' // Increment this when data format changes
-    };
-
-    return new Promise((resolve, reject) => {
-      const request = store.put(cachedData);
-      request.onsuccess = () => {
-        console.log('Data cached to IndexedDB');
-        resolve();
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (error) {
-    console.warn('Failed to cache data:', error);
-  }
-}
-
 // Data loading from URL
 const key = new TextEncoder().encode('0123456789abcdef0123456789abcdef');
 
@@ -144,83 +60,12 @@ async function loadDataFromUrl(url: string, onProgress?: (phase: string, percent
   return { u: combined.u, s: combined.s };
 }
 
-let dataCache: {u: any, s: any} | null = null;
-
-// Background fetch function
-async function fetchFreshData(): Promise<void> {
-  try {
-    const url = fundDataProcessor.getDataUrl();
-    const freshData: {u: any, s: any} = await loadDataFromUrl(url);
-
-    // Update cache with fresh data
-    await setCachedData(freshData);
-
-    // Update in-memory cache if it exists
-    if (dataCache) {
-      dataCache = freshData;
-    }
-
-    console.log('Fresh data fetched and cached successfully');
-  } catch (error) {
-    console.warn('Failed to fetch fresh data:', error);
-  }
-}
-
 async function getData(onProgress?: (phase: string, percent: number) => void): Promise<{u: any, s: any}> {
-  if (dataCache) return dataCache;
-
-  // Local loading removed - use URL inputs instead
-
-  // Production: Try to load from IndexedDB cache first
-  const cachedEntry = await getCachedDataEntry();
-  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  const now = Date.now();
-
-  if (cachedEntry && cachedEntry.data) {
-    dataCache = cachedEntry.data;
-    onProgress?.('Data loaded from cache', 100);
-
-    // Check if cache is stale (older than 24 hours)
-    const isStale = (now - cachedEntry.timestamp) > CACHE_DURATION;
-
-    if (isStale) {
-      console.log('Cache is stale, fetching fresh data in background...');
-      // Fetch fresh data in background without blocking
-      fetchFreshData().catch(error => {
-        console.warn('Failed to fetch fresh data in background:', error);
-      });
-    }
-
-    // dataCache is guaranteed to be set here
-    return dataCache!;
-  }
-
-  // If not in cache, fetch from URL
-  try {
-    onProgress?.('Fetching data from network...', 0);
-    const url = fundDataProcessor.getDataUrl();
-    const freshData: {u: any, s: any} = await loadDataFromUrl(url);
-
-    // Update cache with fresh data
-    await setCachedData(freshData);
-
-    // Update in-memory cache if it exists
-    if (dataCache) {
-      dataCache = freshData;
-    }
-
-    console.log('Fresh data fetched and cached successfully');
-    return freshData;
-  } catch (error) {
-    console.warn('Failed to fetch fresh data:', error);
-    throw error;
-  }
+  const url = fundDataProcessor.getDataUrl();
+  return await loadDataFromUrl(url, onProgress);
 }
 
 class FundDataProcessor {
-  private cachedFunds: FundData[] | null = null;
-  private cachedFilterOptions: FilterOptions | null = null;
-  private cachedRangeValues: any | null = null;
   private dataUrl: string = 'https://fundwaldata.t3.storage.dev/data.b64';
 
   setDataUrl(url: string) {
@@ -352,14 +197,6 @@ class FundDataProcessor {
   }
 
   async parseInstrumentsData(onProgress?: (phase: string, percent: number) => void): Promise<FundData[]> {
-    // Return cached data if available
-    if (this.cachedFunds !== null) {
-      console.log('Using cached fund data');
-      onProgress?.('Using cached data', 100);
-      return this.cachedFunds;
-    }
-
-    console.log('Parsing fund data from JSON...');
     onProgress?.('Fetching instruments data...', 0);
 
     let e = await this.getInstrumentsDaily((phase, percent) => onProgress?.(phase, percent));
@@ -436,20 +273,11 @@ class FundDataProcessor {
     });
 
     onProgress?.('Data processed', 100);
-    // Cache the parsed data
-    this.cachedFunds = n;
     return n;
   }
 
   async getFilterOptions(onProgress?: (phase: string, percent: number) => void): Promise<FilterOptions> {
-    // Return cached filter options if available
-    if (this.cachedFilterOptions !== null) {
-      console.log('Using cached filter options');
-      onProgress?.('Filter options ready', 100);
-      return this.cachedFilterOptions;
-    }
-
-    console.log('Generating filter options...');
+    onProgress?.('Generating filter options...', 0);
     onProgress?.('Generating filter options...', 0);
 
     const funds = await this.parseInstrumentsData(onProgress);
@@ -491,20 +319,11 @@ class FundDataProcessor {
       lockIn: lockInList
     };
 
-    // Cache the filter options
-    this.cachedFilterOptions = filterOptions;
     return filterOptions;
   }
 
   async getRangeValues(onProgress?: (phase: string, percent: number) => void): Promise<RangeValues> {
-    // Return cached range values if available
-    if (this.cachedRangeValues !== null) {
-      console.log('Using cached range values');
-      onProgress?.('Range values ready', 100);
-      return this.cachedRangeValues;
-    }
-
-    console.log('Calculating range values...');
+    onProgress?.('Calculating range values...', 0);
     onProgress?.('Calculating range values...', 0);
 
     const funds = await this.parseInstrumentsData(onProgress);
@@ -575,37 +394,11 @@ class FundDataProcessor {
       }
     };
 
-    // Cache the range values
-    this.cachedRangeValues = rangeValues;
     return rangeValues;
-  }
-
-  // Method to clear cache (useful for development/testing)
-  clearCache(): void {
-    this.cachedFunds = null;
-    this.cachedFilterOptions = null;
-    this.cachedRangeValues = null;
   }
 }
 
 export const fundDataProcessor = new FundDataProcessor();
-
-export async function clearAllCaches(): Promise<void> {
-  dataCache = null;
-  fundDataProcessor.clearCache();
-  try {
-    const db = await openDB();
-    const transaction = db.transaction([DATA_STORE], 'readwrite');
-    const store = transaction.objectStore(DATA_STORE);
-    store.delete(CACHE_KEY);
-    return new Promise((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-  } catch (error) {
-    console.warn('Failed to clear IndexedDB cache:', error);
-  }
-}
 
 export const getAllFunds = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.parseInstrumentsData(onProgress);
 export const getFilterOptions = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getFilterOptions(onProgress);
