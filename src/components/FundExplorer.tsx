@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FundData, FundFilters } from '@/types/fund';
-import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor } from '@/lib/fundData';
+import { getAllFunds, getFilterOptions, getRangeValues, fundDataProcessor, clearAllCaches } from '@/lib/fundData';
 import FilterPanel from './FilterPanel';
 import FundList from './FundList';
 import FundCard from './FundCard';
@@ -521,6 +521,40 @@ export default function FundExplorer() {
     }
   };
 
+  // Force update cache - clears all caches (including IndexedDB) and fetches fresh data
+  const forceUpdateCache = async () => {
+    setRefreshing(true);
+    try {
+      await clearAllCaches();
+
+      const funds = await getAllFunds((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const options = await getFilterOptions((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+      const ranges = await getRangeValues((phase, percent) => {
+        setLoadingPhase(phase);
+        setLoadingPercent(percent);
+      });
+
+      setAllFunds(funds);
+      setFilterOptions(options);
+      setRangeValues(ranges);
+      setFilteredFunds(funds);
+      setLoading(false);
+
+      alert('Cache updated successfully!');
+    } catch (error) {
+      console.error('Failed to force update cache:', error);
+      alert('Failed to update cache. Please check your internet connection.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Get active filter count and descriptions
   const getActiveFiltersInfo = () => {
     const activeFilters: string[] = [];
@@ -618,6 +652,23 @@ export default function FundExplorer() {
                  ) : (
                    <>
                      🔄 Refresh
+                   </>
+                 )}
+               </button>
+               <button
+                 onClick={forceUpdateCache}
+                 disabled={refreshing}
+                 className="px-3 py-2 text-sm bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                 title="Force update cache - clears IndexedDB cache and fetches fresh data"
+               >
+                 {refreshing ? (
+                   <>
+                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                     Updating...
+                   </>
+                 ) : (
+                   <>
+                     ⚡ Force Update Cache
                    </>
                  )}
                </button>

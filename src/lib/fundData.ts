@@ -589,6 +589,24 @@ class FundDataProcessor {
 }
 
 export const fundDataProcessor = new FundDataProcessor();
+
+export async function clearAllCaches(): Promise<void> {
+  dataCache = null;
+  fundDataProcessor.clearCache();
+  try {
+    const db = await openDB();
+    const transaction = db.transaction([DATA_STORE], 'readwrite');
+    const store = transaction.objectStore(DATA_STORE);
+    store.delete(CACHE_KEY);
+    return new Promise((resolve, reject) => {
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+  } catch (error) {
+    console.warn('Failed to clear IndexedDB cache:', error);
+  }
+}
+
 export const getAllFunds = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.parseInstrumentsData(onProgress);
 export const getFilterOptions = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getFilterOptions(onProgress);
 export const getRangeValues = async (onProgress?: (phase: string, percent: number) => void) => await fundDataProcessor.getRangeValues(onProgress);
